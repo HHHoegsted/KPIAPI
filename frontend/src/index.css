@@ -1,0 +1,291 @@
+:root {
+  /* Brand */
+  --brand-900: #002d58; /* primary */
+  --brand-700: #005e82; /* hover/secondary */
+  --brand-300: #74a6c3; /* charts/soft accents */
+  --brand-100: #e1e8f7; /* tint backgrounds */
+
+  /* Neutrals */
+  --gray-900: #1a1a1a;
+  --gray-700: #747373;
+  --gray-500: #abaaaa;
+  --gray-300: #c7c7c7;
+  --gray-200: #dfdfdf;
+  --gray-100: #f4f4f4;
+
+  /* Highlight (sparingly) */
+  --accent-700: #ef7800;
+
+  /* App tokens */
+  --bg: var(--gray-100);
+  --surface: #ffffff;
+  --text: var(--gray-900);
+  --muted: var(--gray-700);
+  --border: var(--gray-200);
+  --link: var(--brand-700);
+  --primary: var(--brand-900);
+  --primary-hover: var(--brand-700);
+
+  font-family: Arial, Verdana, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body {
+  font-family: inherit;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+
+.robots-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: none;
+  table-layout: fixed;
+}
+
+.robots-table thead th {
+  text-align: left;
+  font-weight: 700;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.robots-table tbody td {
+  border-bottom: 1px solid var(--border);
+}
+
+.robots-row--link {
+  transition: background-color 120ms ease, outline-color 120ms ease, transform 120ms ease;
+}
+
+/* Cursor på cellerne */
+.robots-row--link td {
+  cursor: pointer;
+}
+
+/* Mere markant hover */
+.robots-row--link:hover {
+  background: var(--brand-100);
+  transform: translateY(-1px);
+}
+
+/* Venstre "accent bar" på hover (gør det tydeligt) */
+.robots-row--link:hover td:first-child {
+  box-shadow: inset 4px 0 0 0 var(--primary);
+}
+
+/* Fokus til tastaturbrug */
+.robots-row--link:focus-visible {
+  outline: 2px solid var(--primary-hover);
+  outline-offset: -2px;
+  background: var(--brand-100);
+}
+
+/* Også accent bar ved fokus */
+.robots-row--link:focus-visible td:first-child {
+  box-shadow: inset 4px 0 0 0 var(--primary);
+}
+
+.robots-row--link:active {
+  background: var(--brand-300);
+}
+
+.robots-col--name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.robots-col--time {
+  white-space: nowrap;
+}
+
+/* Inaktiv række (meget lys rød) */
+.robots-row--link.robots-row--inactive {
+  background: #fff1f1;
+}
+
+/* Inaktiv hover (lidt tydeligere rød, men stadig diskret) */
+.robots-row--link.robots-row--inactive:hover {
+  background: #ffe6e6;
+}
+
+/* Inaktiv focus-visible */
+.robots-row--link.robots-row--inactive:focus-visible {
+  background: #ffe6e6;
+}
+
+
+button {
+  appearance: none;
+
+  /* Reserve border space so heights match link buttons/secondary variants */
+  border: 1px solid transparent;
+
+  background: var(--primary);
+  color: #ffffff;
+
+  box-sizing: border-box;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 6px;
+
+  font: inherit;
+  font-weight: 700;
+  line-height: 1;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+
+  /* Flat */
+  box-shadow: none;
+  transform: none;
+
+  transition: background-color 120ms ease, filter 120ms ease, border-color 120ms ease;
+}
+
+button:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+button:active:not(:disabled) {
+  filter: brightness(0.95);
+}
+
+button:focus-visible {
+  outline: 2px solid var(--primary-hover);
+  outline-offset: 2px;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: none;
+}
+
+
+/* Link-as-button (React Router <Link> renders <a>) */
+.btn-link {
+  text-decoration: none;
+
+  /* Always reserve border space so heights match (secondary adds border-color) */
+  border: 1px solid transparent;
+
+  background: var(--primary);
+  color: #ffffff;
+
+  /* Make all buttons/links equal height */
+  box-sizing: border-box;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 6px;
+
+  font: inherit;
+  font-weight: 700;
+  line-height: 1;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+
+  box-shadow: none;
+  transform: none;
+
+  transition: background-color 120ms ease, filter 120ms ease, border-color 120ms ease;
+}
+
+.btn-link:hover {
+  background: var(--primary-hover);
+}
+
+.btn-link:active {
+  filter: brightness(0.95);
+}
+
+.btn-link:focus-visible {
+  outline: 2px solid var(--primary-hover);
+  outline-offset: 2px;
+}
+
+/* Prevent visited links changing color */
+.btn-link:visited {
+  color: #ffffff;
+}
+
+/* Secondary variant (works for both <button class="btn-secondary"> and <a class="btn-link btn-secondary">) */
+.btn-secondary {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover:not(:disabled),
+.btn-link.btn-secondary:hover {
+  background: var(--gray-100);
+  border-color: var(--primary-hover);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+
+.card-title {
+  color: var(--muted);
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+
+.kv {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  column-gap: 12px;
+  row-gap: 6px;
+  margin: 0;
+}
+
+.kv dt {
+  margin: 0;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.kv dd {
+  margin: 0;
+  color: var(--text);
+}

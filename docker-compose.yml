@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: kpiapi-postgres
+    environment:
+      POSTGRES_DB: kpiapi
+      POSTGRES_USER: kpiapi
+      POSTGRES_PASSWORD: kpiapi_pw
+    ports:
+      - "5432:5432"
+    volumes:
+      - kpiapi_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kpiapi -d kpiapi"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kpiapi-api
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=kpiapi;Username=kpiapi;Password=kpiapi_pw
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+  
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: kpiapi-frontend
+    depends_on:
+      - api
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+
+volumes:
+  kpiapi_pgdata:
