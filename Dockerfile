@@ -1,38 +1,41 @@
-# Build
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
-WORKDIR /src
-COPY . .
-RUN dotnet restore
-RUN dotnet publish -c Release -o /out
 
-# Runtime + EF tools for migrations (simple + reliable)
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS runtime
+WORKDIR /src
+
+COPY KPIAPI.csproj ./
+RUN dotnet restore KPIAPI.csproj
+
+COPY . ./
+RUN dotnet publish KPIAPI.csproj -c Release -o /app/publish /p:UseAppHost=false
+
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS migrate
+
 WORKDIR /app
 
-# pg_isready for readiness checks
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends postgresql-client \
-  && rm -rf /var/lib/apt/lists/*
+    && apt-get install -y --no-install-recommends postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
 
-# EF tools
 RUN dotnet tool install --global dotnet-ef
-ENV PATH="$PATH:/root/.dotnet/tools"
+ENV PATH="${PATH}:/root/.dotnet/tools"
 
-# Copy NuGet package cache from build stage so EF can run without downloading
 COPY --from=build /root/.nuget /root/.nuget
-
-# 1) Published output for running the API
-COPY --from=build /out /app/published
-
-# 2) Project source so dotnet-ef can find csproj/migrations
 COPY . /app/src
 
-# IMPORTANT: remove Windows build artifacts that break Linux builds
-RUN find /app/src -type d \( -name bin -o -name obj -o -name .vs \) -prune -exec rm -rf {} +
+WORKDIR /app/src
 
-# Entrypoint
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-EXPOSE 8080
 ENTRYPOINT ["/entrypoint.sh"]
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+
+WORKDIR /app
+
+ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 8080
+
+COPY --from=build /app/publish ./
+
+ENTRYPOINT ["dotnet", "KPIAPI.dll"]

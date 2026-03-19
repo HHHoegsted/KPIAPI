@@ -1,0 +1,12 @@
+.git
+.gitignore
+.vs
+.vscode
+bin
+obj
+**/bin
+**/obj
+frontend/node_modules
+frontend/dist
+DockerCompose*
+README.md

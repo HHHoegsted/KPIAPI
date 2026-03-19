@@ -17,10 +17,24 @@ services:
       retries: 20
     restart: unless-stopped
 
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: migrate
+    container_name: kpiapi-migrate
+    environment:
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=kpiapi;Username=kpiapi;Password=kpiapi_pw
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   api:
     build:
       context: .
       dockerfile: Dockerfile
+      target: final
     container_name: kpiapi-api
     environment:
       ASPNETCORE_URLS: http://+:8080
@@ -29,10 +43,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     ports:
       - "8080:8080"
     restart: unless-stopped
-  
+
   frontend:
     build:
       context: ./frontend
