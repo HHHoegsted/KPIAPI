@@ -1,15 +1,6 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 
-WORKDIR /src
-
-COPY KPIAPI.csproj ./
-RUN dotnet restore KPIAPI.csproj
-
-COPY . ./
-RUN dotnet publish KPIAPI.csproj -c Release -o /app/publish /p:UseAppHost=false
-
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS migrate
-
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS runtime
 WORKDIR /app
 
 RUN apt-get update \
@@ -20,9 +11,12 @@ RUN dotnet tool install --global dotnet-ef
 ENV PATH="${PATH}:/root/.dotnet/tools"
 
 COPY --from=build /root/.nuget /root/.nuget
+
+COPY --from=build /out /app/published
+
 COPY . /app/src
 
-WORKDIR /app/src
+RUN find /app/src -type d \( -name bin -o -name obj -o -name .vs \) -prune -exec rm -rf {} +
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
