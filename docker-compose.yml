@@ -5,7 +5,7 @@ services:
     environment:
       POSTGRES_DB: kpiapi
       POSTGRES_USER: kpiapi
-      POSTGRES_PASSWORD: kpiapi_pw
+      POSTGRES_PASSWORD: ${KPIAPI_DB_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
@@ -24,7 +24,7 @@ services:
       target: migrate
     container_name: kpiapi-migrate
     environment:
-      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=kpiapi;Username=kpiapi;Password=kpiapi_pw
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=kpiapi;Username=kpiapi;Password=${KPIAPI_DB_PASSWORD}
     depends_on:
       postgres:
         condition: service_healthy
@@ -39,7 +39,7 @@ services:
     environment:
       ASPNETCORE_URLS: http://+:8080
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=kpiapi;Username=kpiapi;Password=kpiapi_pw
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=kpiapi;Username=kpiapi;Password=${KPIAPI_DB_PASSWORD}
     depends_on:
       postgres:
         condition: service_healthy
