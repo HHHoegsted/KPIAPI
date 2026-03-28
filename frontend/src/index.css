@@ -40,9 +40,26 @@
     -moz-osx-font-smoothing: grayscale;
 }
 
+* {
+    box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+    margin: 0;
+    min-height: 100%;
+    padding: 0;
+}
+
 html,
 body {
     font-family: inherit;
+}
+
+body {
+    background: var(--bg);
+    color: var(--text);
 }
 
 button,
@@ -50,6 +67,16 @@ input,
 select,
 textarea {
     font: inherit;
+}
+
+a {
+    color: inherit;
+}
+
+h1,
+h2,
+h3 {
+    text-align: left;
 }
 
 .robots-table {
@@ -66,40 +93,39 @@ textarea {
         color: var(--text);
         border-bottom: 1px solid var(--border);
         background: var(--surface);
+        padding: 12px 14px;
     }
 
     .robots-table tbody td {
         border-bottom: 1px solid var(--border);
+        padding: 14px;
+        text-align: left;
+        vertical-align: middle;
     }
 
 .robots-row--link {
     transition: background-color 120ms ease, outline-color 120ms ease, transform 120ms ease;
 }
 
-    /* Cursor på cellerne */
     .robots-row--link td {
         cursor: pointer;
     }
 
-    /* Mere markant hover */
     .robots-row--link:hover {
         background: var(--brand-100);
         transform: translateY(-1px);
     }
 
-        /* Venstre "accent bar" på hover (gør det tydeligt) */
         .robots-row--link:hover td:first-child {
             box-shadow: inset 4px 0 0 0 var(--primary);
         }
 
-    /* Fokus til tastaturbrug */
     .robots-row--link:focus-visible {
         outline: 2px solid var(--primary-hover);
         outline-offset: -2px;
         background: var(--brand-100);
     }
 
-        /* Også accent bar ved fokus */
         .robots-row--link:focus-visible td:first-child {
             box-shadow: inset 4px 0 0 0 var(--primary);
         }
@@ -112,23 +138,22 @@ textarea {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-weight: 600;
 }
 
 .robots-col--time {
     white-space: nowrap;
 }
 
-/* Inaktiv række (meget lys rød) */
+/* Inaktiv række */
 .robots-row--link.robots-row--inactive {
     background: #fff1f1;
 }
 
-    /* Inaktiv hover (lidt tydeligere rød, men stadig diskret) */
     .robots-row--link.robots-row--inactive:hover {
         background: #ffe6e6;
     }
 
-    /* Inaktiv focus-visible */
     .robots-row--link.robots-row--inactive:focus-visible {
         background: #ffe6e6;
     }
@@ -205,7 +230,7 @@ button {
         filter: none;
     }
 
-/* Link-as-button (React Router <Link> renders <a>) */
+/* Link-as-button */
 .btn-link {
     text-decoration: none;
     border: 1px solid transparent;
@@ -243,7 +268,6 @@ button {
         outline-offset: 2px;
     }
 
-    /* Prevent visited links changing color */
     .btn-link:visited {
         color: inherit;
     }
@@ -279,6 +303,7 @@ button.btn-secondary {
     border: 1px solid var(--border);
     border-radius: 6px;
     padding: 12px 14px;
+    text-align: left;
 }
 
 .card-title {
@@ -305,3 +330,24 @@ button.btn-secondary {
         margin: 0;
         color: var(--text);
     }
+
+@media (max-width: 900px) {
+    .summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 640px) {
+    .summary-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .robots-table thead th,
+    .robots-table tbody td {
+        padding: 10px 12px;
+    }
+
+    .robots-col--time {
+        white-space: normal;
+    }
+}

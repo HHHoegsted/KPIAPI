@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/apiClient";
 import type { RobotRunsPageSummaryDto, RunListItemDto } from "../api/types";
 
@@ -110,6 +110,7 @@ function runLabel(outcome: number | null): string {
 }
 
 export default function RunsPage() {
+    const navigate = useNavigate();
     const { robotKey = "" } = useParams();
 
     const pageTitle = useMemo(
@@ -146,6 +147,10 @@ export default function RunsPage() {
     useEffect(() => {
         load();
     }, [robotKey]);
+
+    function goToRun(runId: string) {
+        navigate(`/robots/${encodeURIComponent(robotKey)}/runs/${encodeURIComponent(runId)}`);
+    }
 
     return (
         <>
@@ -217,7 +222,20 @@ export default function RunsPage() {
 
                 <tbody>
                     {rows.map((r) => (
-                        <tr key={r.runId} className={outcomeClass(r.outcome)}>
+                        <tr
+                            key={r.runId}
+                            className={`${outcomeClass(r.outcome)} robots-row--link`}
+                            onClick={() => goToRun(r.runId)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    goToRun(r.runId);
+                                }
+                            }}
+                            tabIndex={0}
+                            role="link"
+                            aria-label={`Åbn kørsel ${r.runId}`}
+                        >
                             <td className="robots-col--name">
                                 <div style={{ fontWeight: 700 }}>{runLabel(r.outcome)}</div>
                                 <div style={{ color: "var(--muted)", fontSize: "0.92em" }}>

@@ -250,5 +250,45 @@ namespace KPIAPI.Controllers
 
                     return Ok(result);
         }
+
+
+        [HttpGet("{runId}")]
+        public async Task<ActionResult<RunDetailsDto>> GetRun(
+            [FromRoute] string robotKey,
+            [FromRoute] string runId)
+                {
+                    robotKey = robotKey.Trim().ToLowerInvariant();
+                    runId = runId.Trim();
+
+                    var robot = await _db.Robots.AsNoTracking()
+                        .FirstOrDefaultAsync(r => r.Key == robotKey);
+
+                    if (robot == null)
+                        return NotFound($"Robot '{robotKey}' not found");
+
+                    var run = await _db.RobotRuns.AsNoTracking()
+                        .FirstOrDefaultAsync(r => r.RobotId == robot.Id && r.RunId == runId);
+
+                    if (run == null)
+                        return NotFound($"Run '{runId}' not found for robot '{robotKey}'");
+
+                    var eventCount = await _db.RunEvents.AsNoTracking()
+                        .CountAsync(e => e.RobotRunId == run.Id);
+
+                    var measurementCount = await _db.KpiMeasurements.AsNoTracking()
+                        .CountAsync(m => m.RunEvent.RobotRunId == run.Id);
+
+                    return Ok(new RunDetailsDto(
+                        RunId: run.RunId,
+                        StartTimeUtc: run.StartTimeUtc,
+                        EndTimeUtc: run.EndTimeUtc,
+                        LastHeartbeatUtc: run.LastHeartbeatUtc,
+                        Outcome: run.Outcome,
+                        ErrorCode: run.ErrorCode,
+                        ErrorMessage: run.ErrorMessage,
+                        EventCount: eventCount,
+                        MeasurementCount: measurementCount
+                    ));
+        }
     }
 }

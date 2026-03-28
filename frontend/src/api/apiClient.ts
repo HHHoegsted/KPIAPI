@@ -3,6 +3,7 @@ import type {
     KpiDefinition,
     RobotListItem,
     RobotRunsPageSummaryDto,
+    RunKpiMeasurementDto,
     RunListItemDto,
 } from "./types";
 
@@ -52,6 +53,10 @@ export const api = {
         );
     },
 
+    getRunKpis: (robotKey: string, runId: string) =>
+        request<RunKpiMeasurementDto[]>(
+            `/api/robots/${encodeURIComponent(robotKey)}/runs/${encodeURIComponent(runId)}/kpis`
+        ),
 
     listKpiDefinitions: (robotKey: string, activeOnly: boolean) =>
         request<KpiDefinition[]>(
