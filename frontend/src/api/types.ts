@@ -53,18 +53,22 @@ export type RunListItemDto = {
     measurementCount: number;
 };
 
-export type RobotDashboardConfigDto = {
-    totalItemsKpiKey: string | null;
-    hitlItemsKpiKey: string | null;
-    totalItemsAggregation: number;
-    hitlItemsAggregation: number;
-    filterKpiKey: string | null;
-    filterKpiTextEquals: string | null;
-};
+export type RunKpiMeasurementDto = {
+    eventId: number;
+    eventCreatedUtc: string;
+    eventMessage: string | null;
 
-export type RobotDashboardConfigResponseDto = {
-    robotKey: string;
-    config: RobotDashboardConfigDto | null;
+    kpiDefinitionId: number;
+    kpiKey: string;
+    kpiName: string;
+    unit: string | null;
+    valueType: number;
+
+    intValue: number | null;
+    decimalValue: number | null;
+    boolValue: boolean | null;
+    durationMs: number | null;
+    textValue: string | null;
 };
 
 export type EnumValue = {
