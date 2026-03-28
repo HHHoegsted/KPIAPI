@@ -493,10 +493,10 @@ namespace KPIAPI.Controllers
 
         [HttpGet]
         public async Task<ActionResult<List<RunListItemDto>>> ListRunsForRobot(
-            [FromRoute] string robotKey,
-            [FromQuery] DateTime? fromUtc = null,
-            [FromQuery] int limit = 200,
-            [FromQuery] string sort = "desc")
+    [FromRoute] string robotKey,
+    [FromQuery] DateTime? fromUtc = null,
+    [FromQuery] int limit = 200,
+    [FromQuery] string sort = "desc")
         {
             robotKey = robotKey.Trim().ToLowerInvariant();
             limit = Math.Clamp(limit, 1, 2000);
@@ -525,7 +525,14 @@ namespace KPIAPI.Controllers
 
             var runs = await runsQuery
                 .Take(limit)
-                .Select(r => new { r.Id, r.RunId, r.StartTimeUtc, r.EndTimeUtc })
+                .Select(r => new
+                {
+                    r.Id,
+                    r.RunId,
+                    r.StartTimeUtc,
+                    r.EndTimeUtc,
+                    r.Outcome
+                })
                 .ToListAsync();
 
             if (runs.Count == 0)
@@ -549,6 +556,7 @@ namespace KPIAPI.Controllers
                 RunId: r.RunId,
                 StartTimeUtc: r.StartTimeUtc,
                 EndTimeUtc: r.EndTimeUtc,
+                Outcome: r.Outcome,
                 EventCount: eventCounts.TryGetValue(r.Id, out var ec) ? ec : 0,
                 MeasurementCount: measurementCounts.TryGetValue(r.Id, out var mc) ? mc : 0
             )).ToList();
