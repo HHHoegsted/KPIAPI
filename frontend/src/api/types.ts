@@ -34,22 +34,6 @@ export type KpiRollupDto = {
     topTextValues: Record<string, number> | null;
 };
 
-export type RobotDashboardSummaryDto = {
-    robotKey: string;
-    fromUtc: string | null;
-    toUtc: string | null;
-    runCount: number;
-    eventCount: number;
-    measurementCount: number;
-    firstEventUtc: string | null;
-    lastEventUtc: string | null;
-    kpis: KpiRollupDto[];
-    coveragePct: number | null;
-    totalItems: number | null;
-    hitlItems: number | null;
-    completedItems: number | null;
-};
-
 export type RobotRunsPageSummaryDto = {
     robotKey: string;
     runCount: number;

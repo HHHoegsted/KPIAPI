@@ -12,7 +12,6 @@ public class AppDbContext : DbContext
     public DbSet<RunEvent> RunEvents => Set<RunEvent>();
     public DbSet<KpiDefinition> KpiDefinitions => Set<KpiDefinition>();
     public DbSet<KpiMeasurement> KpiMeasurements => Set<KpiMeasurement>();
-    public DbSet<RobotDashboardConfig> RobotDashboardConfigs => Set<RobotDashboardConfig>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -35,9 +34,6 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<KpiMeasurement>()
             .HasIndex(m => new { m.RunEventId, m.KpiDefinitionId });
 
-        modelBuilder.Entity<RobotDashboardConfig>()
-            .HasIndex(c => c.RobotId)
-            .IsUnique();
 
         // Relationships
         modelBuilder.Entity<Robot>()
@@ -69,12 +65,6 @@ public class AppDbContext : DbContext
             .WithOne(m => m.KpiDefinition)
             .HasForeignKey(m => m.KpiDefinitionId)
             .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<RobotDashboardConfig>()
-            .HasOne(c => c.Robot)
-            .WithOne()
-            .HasForeignKey<RobotDashboardConfig>(c => c.RobotId)
-            .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<KpiMeasurement>()
             .Property(m => m.DecimalValue)
