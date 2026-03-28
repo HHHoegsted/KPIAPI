@@ -355,5 +355,64 @@ namespace KPIAPI.Controllers
 
             return Ok(robots);
         }
+
+        [HttpGet("{robotKey}/summary")]
+        public async Task<ActionResult<RobotRunsPageSummaryDto>> GetRobotSummary(
+            [FromRoute] string robotKey,
+            [FromQuery] DateTime? fromUtc = null,
+            [FromQuery] DateTime? toUtc = null)
+            {
+                robotKey = robotKey.Trim().ToLowerInvariant();
+
+                var robot = await _db.Robots.AsNoTracking().FirstOrDefaultAsync(r => r.Key == robotKey);
+                if (robot == null)
+                    return NotFound($"Robot '{robotKey}' not found");
+
+                DateTime? from = null;
+                DateTime? to = null;
+
+                if (fromUtc != null)
+                {
+                    from = fromUtc.Value.Kind == DateTimeKind.Unspecified
+                        ? DateTime.SpecifyKind(fromUtc.Value, DateTimeKind.Utc)
+                        : fromUtc.Value.ToUniversalTime();
+                }
+
+                if (toUtc != null)
+                {
+                    to = toUtc.Value.Kind == DateTimeKind.Unspecified
+                        ? DateTime.SpecifyKind(toUtc.Value, DateTimeKind.Utc)
+                        : toUtc.Value.ToUniversalTime();
+                }
+
+                var runsQuery = _db.RobotRuns.AsNoTracking().Where(r => r.RobotId == robot.Id);
+
+                if (from != null) runsQuery = runsQuery.Where(r => r.StartTimeUtc >= from.Value);
+                if (to != null) runsQuery = runsQuery.Where(r => r.StartTimeUtc <= to.Value);
+
+                var runCount = await runsQuery.CountAsync();
+
+                var eventsQuery = _db.RunEvents.AsNoTracking()
+                    .Where(e => e.RobotRun.RobotId == robot.Id);
+
+                if (from != null) eventsQuery = eventsQuery.Where(e => e.CreatedUtc >= from.Value);
+                if (to != null) eventsQuery = eventsQuery.Where(e => e.CreatedUtc <= to.Value);
+
+                var eventFacts = await eventsQuery
+                    .Select(e => new { e.CreatedUtc })
+                    .ToListAsync();
+
+                var eventCount = eventFacts.Count;
+                var firstEventUtc = eventCount == 0 ? null : eventFacts.Min(x => (DateTime?)x.CreatedUtc);
+                var lastEventUtc = eventCount == 0 ? null : eventFacts.Max(x => (DateTime?)x.CreatedUtc);
+
+                return Ok(new RobotRunsPageSummaryDto(
+                    RobotKey: robotKey,
+                    RunCount: runCount,
+                    EventCount: eventCount,
+                    FirstEventUtc: firstEventUtc,
+                    LastEventUtc: lastEventUtc
+                ));
+        }
     }
 }
