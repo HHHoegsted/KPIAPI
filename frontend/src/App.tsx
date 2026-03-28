@@ -1,7 +1,6 @@
 import { Navigate, Route, Routes, Outlet, Link, useLocation } from "react-router-dom";
 import RobotsPage from "./pages/RobotsPage";
 import RunsPage from "./pages/RunsPage";
-import DashboardConfigPage from "./pages/DashboardConfigPage";
 
 // Behold din eksisterende logo-opsætning her
 const LOGO_FILE = "HK_LOGO_LOGO_BLÅ_150x45px.png";
@@ -67,7 +66,6 @@ export default function App() {
       <Route element={<Layout />}>
         <Route path="/" element={<RobotsPage />} />
         <Route path="/robots/:robotKey" element={<RunsPage />} />
-        <Route path="/robots/:robotKey/config" element={<DashboardConfigPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

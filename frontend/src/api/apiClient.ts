@@ -1,9 +1,6 @@
 import type {
     EnumResponse,
     KpiDefinition,
-    RobotDashboardConfigDto,
-    RobotDashboardConfigResponseDto,
-    RobotDashboardSummaryDto,
     RobotListItem,
     RobotRunsPageSummaryDto,
     RunListItemDto,
@@ -55,32 +52,11 @@ export const api = {
         );
     },
 
-    getRobotDashboard: (robotKey: string, fromUtcIso?: string, toUtcIso?: string) => {
-        const qs = new URLSearchParams();
-        if (fromUtcIso) qs.set("fromUtc", fromUtcIso);
-        if (toUtcIso) qs.set("toUtc", toUtcIso);
-        const q = qs.toString();
-
-        return request<RobotDashboardSummaryDto>(
-            `/api/robots/${encodeURIComponent(robotKey)}/dashboard${q ? `?${q}` : ""}`
-        );
-    },
 
     listKpiDefinitions: (robotKey: string, activeOnly: boolean) =>
         request<KpiDefinition[]>(
             `/api/robots/${encodeURIComponent(robotKey)}/kpi-definitions?activeOnly=${activeOnly}`
         ),
-
-    getDashboardConfig: (robotKey: string) =>
-        request<RobotDashboardConfigResponseDto>(
-            `/api/robots/${encodeURIComponent(robotKey)}/dashboard-config`
-        ),
-
-    putDashboardConfig: (robotKey: string, dto: RobotDashboardConfigDto) =>
-        request<void>(`/api/robots/${encodeURIComponent(robotKey)}/dashboard-config`, {
-            method: "PUT",
-            body: JSON.stringify(dto),
-        }),
 
     getKpiValueTypeEnum: () => request<EnumResponse>(`/api/meta/enums/kpi-value-type`),
 };
