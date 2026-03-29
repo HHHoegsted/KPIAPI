@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/apiClient";
-import type { EnumResponse, RobotDashboardSummaryDto } from "../api/types";
+import type {
+  EnumResponse,
+  RobotDashboardSummaryDto,
+  RunDashboardSummaryDto,
+  RunListItemDto,
+} from "../api/types";
 
 function fmtLocalDk(isoUtc: string | null) {
   if (!isoUtc) return "—";
@@ -74,6 +79,9 @@ export default function RobotDashboardPage() {
   const [data, setData] = useState<RobotDashboardSummaryDto | null>(null);
   const [kpiValueTypeEnum, setKpiValueTypeEnum] = useState<EnumResponse | null>(null);
 
+  const [runs, setRuns] = useState<RunListItemDto[]>([]);
+  const [runDashboards, setRunDashboards] = useState<RunDashboardSummaryDto[]>([]);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -89,19 +97,45 @@ export default function RobotDashboardPage() {
     return (v: number) => map.get(v) ?? String(v);
   }, [kpiValueTypeEnum]);
 
+  const runDashboardsById = useMemo(() => {
+    const map = new Map<string, RunDashboardSummaryDto>();
+    runDashboards.forEach((r) => map.set(r.runId, r));
+    return map;
+  }, [runDashboards]);
+
   async function load() {
     setLoading(true);
     setError(null);
+
     try {
-      const [dash, enumResp] = await Promise.all([
+      const [dash, enumResp, runList] = await Promise.all([
         api.getRobotDashboard(robotKey, fromIso, toIso),
         api.getKpiValueTypeEnum(),
+        api.listRunsForRobot(robotKey, fromIso, 200, "desc"),
       ]);
+
+      const perRunResults = await Promise.allSettled(
+        runList.map((r) => api.getRunDashboard(robotKey, r.runId))
+      );
+
+      const perRunDashboards = perRunResults
+        .flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
+
+      const failedCount = perRunResults.filter((r) => r.status === "rejected").length;
+
       setData(dash);
       setKpiValueTypeEnum(enumResp);
+      setRuns(runList);
+      setRunDashboards(perRunDashboards);
+
+      if (failedCount > 0) {
+        setError(`${failedCount} kørsel(er) kunne ikke indlæses fuldt ud.`);
+      }
     } catch (e: unknown) {
       setError(toErrorMessage(e));
       setData(null);
+      setRuns([]);
+      setRunDashboards([]);
     } finally {
       setLoading(false);
     }
@@ -118,7 +152,7 @@ export default function RobotDashboardPage() {
         <h1 style={{ marginBottom: 8 }}>{pageTitle}</h1>
       </div>
 
-      <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>
+      <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
         <label htmlFor="daysBack" style={{ display: "flex", gap: 8, alignItems: "center" }}>
           Dage tilbage:
           <input
@@ -151,7 +185,6 @@ export default function RobotDashboardPage() {
 
       {data && (
         <>
-          {/* Uses your index.css classes: summary-grid, card, card-title, kv */}
           <div className="summary-grid" style={{ marginBottom: 16 }}>
             <div className="card">
               <div className="card-title">Periode</div>
@@ -196,45 +229,115 @@ export default function RobotDashboardPage() {
             Første hændelse: {fmtLocalDk(data.firstEventUtc)} • Seneste hændelse: {fmtLocalDk(data.lastEventUtc)}
           </div>
 
-          <h2 style={{ marginTop: 20, marginBottom: 8 }}>KPI-opsummering</h2>
-          <table width="100%" cellPadding={8} style={{ borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border)" }}>
-                <th>Nøgle</th>
-                <th>Navn</th>
-                <th>Type</th>
-                <th>Antal</th>
-                <th>Senest registreret</th>
-                <th>Sum</th>
-                <th>Gns.</th>
-                <th>Min</th>
-                <th>Max</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.kpis.map((k) => (
-                <tr key={k.key} style={{ borderBottom: "1px solid var(--border)" }}>
-                  <td style={{ fontFamily: "monospace" }}>{k.key}</td>
-                  <td>{k.name}</td>
-                  <td>{valueTypeName(k.valueType)}</td>
-                  <td>{fmtNum(k.count)}</td>
-                  <td>{fmtLocalDk(k.lastRecordedUtc)}</td>
-                  <td>{fmtNum(k.sum)}</td>
-                  <td>{fmtNum(k.avg)}</td>
-                  <td>{fmtNum(k.min)}</td>
-                  <td>{fmtNum(k.max)}</td>
-                </tr>
-              ))}
+          <h2 style={{ marginTop: 20, marginBottom: 8 }}>Kørsler</h2>
 
-              {data.kpis.length === 0 && (
-                <tr>
-                  <td colSpan={9} style={{ padding: 12 }}>
-                    Ingen KPI&apos;er i denne periode.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          {runs.length === 0 && (
+            <div style={{ padding: 12 }}>Ingen kørsler i denne periode.</div>
+          )}
+
+          {runs.map((run) => {
+            const dashboard = runDashboardsById.get(run.runId);
+
+            return (
+              <div
+                key={run.runId}
+                className="card"
+                style={{ marginBottom: 16, padding: 16 }}
+              >
+                <h3 style={{ marginTop: 0, marginBottom: 8 }}>
+                  Kørsel: <span style={{ fontFamily: "monospace" }}>{run.runId}</span>
+                </h3>
+
+                <div style={{ marginBottom: 12, color: "var(--muted)" }}>
+                  Start: {fmtLocalDk(run.startTimeUtc)} • Slut: {fmtLocalDk(run.endTimeUtc)}
+                </div>
+
+                <dl
+                  className="kv"
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "max-content 1fr",
+                    gap: "4px 12px",
+                    marginBottom: 12,
+                  }}
+                >
+                  <dt>Hændelser</dt>
+                  <dd>{fmtNum(dashboard?.eventCount ?? run.eventCount)}</dd>
+
+                  <dt>Målinger</dt>
+                  <dd>{fmtNum(dashboard?.measurementCount ?? run.measurementCount)}</dd>
+
+                  <dt>Dæknings%</dt>
+                  <dd>
+                    {dashboard?.coveragePct == null
+                      ? "—"
+                      : `${Number(dashboard.coveragePct).toFixed(2)}%`}
+                  </dd>
+
+                  <dt>Total antal</dt>
+                  <dd>{fmtNum(dashboard?.totalItems)}</dd>
+
+                  <dt>HITL-antal</dt>
+                  <dd>{fmtNum(dashboard?.hitlItems)}</dd>
+
+                  <dt>Fuldført</dt>
+                  <dd>{fmtNum(dashboard?.completedItems)}</dd>
+
+                  <dt>Første hændelse</dt>
+                  <dd>{fmtLocalDk(dashboard?.firstEventUtc ?? null)}</dd>
+
+                  <dt>Seneste hændelse</dt>
+                  <dd>{fmtLocalDk(dashboard?.lastEventUtc ?? null)}</dd>
+                </dl>
+
+                {!dashboard ? (
+                  <div style={{ padding: 12 }}>KPI-data kunne ikke indlæses for denne kørsel.</div>
+                ) : (
+                  <table width="100%" cellPadding={8} style={{ borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border)" }}>
+                        <th>Nøgle</th>
+                        <th>Navn</th>
+                        <th>Type</th>
+                        <th>Antal</th>
+                        <th>Senest registreret</th>
+                        <th>Sum</th>
+                        <th>Gns.</th>
+                        <th>Min</th>
+                        <th>Max</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dashboard.kpis.map((k) => (
+                        <tr
+                          key={`${dashboard.runId}-${k.key}`}
+                          style={{ borderBottom: "1px solid var(--border)" }}
+                        >
+                          <td style={{ fontFamily: "monospace" }}>{k.key}</td>
+                          <td>{k.name}</td>
+                          <td>{valueTypeName(k.valueType)}</td>
+                          <td>{fmtNum(k.count)}</td>
+                          <td>{fmtLocalDk(k.lastRecordedUtc)}</td>
+                          <td>{fmtNum(k.sum)}</td>
+                          <td>{fmtNum(k.avg)}</td>
+                          <td>{fmtNum(k.min)}</td>
+                          <td>{fmtNum(k.max)}</td>
+                        </tr>
+                      ))}
+
+                      {dashboard.kpis.length === 0 && (
+                        <tr>
+                          <td colSpan={9} style={{ padding: 12 }}>
+                            Ingen KPI&apos;er for denne kørsel.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            );
+          })}
         </>
       )}
     </div>
