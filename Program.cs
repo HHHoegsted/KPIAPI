@@ -1,5 +1,4 @@
 using KPIAPI.Data;
-using KPIAPI.Controllers;
 using KPIAPI.Services;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,7 +17,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<RobotService>();
 builder.Services.AddScoped<RunsService>();
 builder.Services.AddScoped<RunEventsService>();
-
+builder.Services.AddScoped<MetaService>();
+builder.Services.AddScoped<KpiDefinitionsService>();
 
 var app = builder.Build();
 
