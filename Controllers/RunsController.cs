@@ -1,9 +1,6 @@
-﻿using KPIAPI.Data;
-using KPIAPI.Domain;
-using KPIAPI.Domain.Entities;
-using KPIAPI.DTOs;
+﻿using KPIAPI.DTOs;
+using KPIAPI.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace KPIAPI.Controllers
 {
@@ -11,172 +8,51 @@ namespace KPIAPI.Controllers
     [Route("api/robots/{robotKey}/runs")]
     public class RunsController : ControllerBase
     {
-        private readonly AppDbContext _db;
+        private readonly RunsService _runsService;
 
-        public RunsController(AppDbContext db)
+        public RunsController(RunsService runsService)
         {
-            _db = db;
+            _runsService = runsService;
         }
 
         [HttpPost("start")]
         public async Task<ActionResult> Start([FromRoute] string robotKey, [FromBody] StartRunRequest? request)
         {
-            if (string.IsNullOrWhiteSpace(robotKey))
-                return BadRequest("Robot key is required.");
-
-            if (!RobotKey.TryParse(robotKey, out var parts))
-                return BadRequest("Robot key must match: yynnn-ccc-display-name-of-robot.");
-
-            var key = parts.Key;
-
-            var robot = await _db.Robots.FirstOrDefaultAsync(r => r.Key == key);
-
-            if (robot == null)
+            var result = await _runsService.StartAsync(robotKey, request);
+            var errorProp = result?.GetType().GetProperty("Error");
+            if (errorProp != null)
             {
-                robot = new Robot
-                {
-                    Key = key,
-                    CenterCode = parts.CenterCode,
-                    DisplayName = parts.DisplayName,
-                    IsActive = true,
-                    CreatedUtc = DateTime.UtcNow
-                };
-
-                _db.Robots.Add(robot);
-                await _db.SaveChangesAsync();
+                var error = errorProp.GetValue(result) as string;
+                if (!string.IsNullOrEmpty(error))
+                    return BadRequest(error);
             }
-
-            var runId = Guid.NewGuid().ToString("N");
-
-            var run = new RobotRun
-            {
-                RobotId = robot.Id,
-                RunId = runId,
-                StartTimeUtc = request?.StartTimeUtc?.ToUniversalTime() ?? DateTime.UtcNow
-            };
-
-            _db.RobotRuns.Add(run);
-            await _db.SaveChangesAsync();
-
-            return Ok(new
-            {
-                run.Id,
-                run.RunId,
-                run.StartTimeUtc
-            });
+            return Ok(result);
         }
-
 
         [HttpPost("{runId}/complete")]
         public async Task<ActionResult> Complete([FromRoute] string robotKey, [FromRoute] string runId, [FromBody] CompleteRunRequest request)
         {
-            if (string.IsNullOrWhiteSpace(robotKey))
-                return BadRequest("Robot key is required.");
-
-            if (string.IsNullOrWhiteSpace(runId))
-                return BadRequest("Run ID is required.");
-
-            robotKey = robotKey.Trim().ToLowerInvariant();
-            runId = runId.Trim();
-
-            var robot = await _db.Robots.FirstOrDefaultAsync(r => r.Key == robotKey);
-            if (robot == null)
-                return NotFound($"Robot with key '{robotKey}' not found.");
-
-            var run = await _db.RobotRuns.FirstOrDefaultAsync(r => r.RunId == runId && r.RobotId == robot.Id);
-            if (run == null)
-                return NotFound($"Run with ID '{runId}' for robot '{robotKey}' not found.");
-
-            if (run.Outcome != null)
-                return BadRequest($"Run with ID '{runId}' for robot '{robotKey}' has already been completed.");
-
-            run.Outcome = request.Outcome;
-            run.EndTimeUtc = request.EndTimeUtc?.ToUniversalTime() ?? DateTime.UtcNow;
-            run.ErrorCode = request.ErrorCode;
-            run.ErrorMessage = request.ErrorMessage;
-
-            await _db.SaveChangesAsync();
-
+            var error = await _runsService.CompleteAsync(robotKey, runId, request);
+            if (!string.IsNullOrEmpty(error))
+                return BadRequest(error);
             return NoContent();
         }
-
 
         [HttpPost("{runId}/heartbeat")]
-        public async Task<ActionResult> Heartbeat(
-            [FromRoute] string robotKey,
-            [FromRoute] string runId,
-            [FromBody] RunHeartbeatRequest? request)
+        public async Task<ActionResult> Heartbeat([FromRoute] string robotKey, [FromRoute] string runId, [FromBody] RunHeartbeatRequest? request)
         {
-            if (string.IsNullOrWhiteSpace(robotKey))
-                return BadRequest("Robot key is required.");
-
-            if (string.IsNullOrWhiteSpace(runId))
-                return BadRequest("Run ID is required.");
-
-            robotKey = robotKey.Trim().ToLowerInvariant();
-            runId = runId.Trim();
-
-            var robot = await _db.Robots.FirstOrDefaultAsync(r => r.Key == robotKey);
-            if (robot == null)
-                return NotFound($"Robot with key '{robotKey}' not found.");
-
-            var run = await _db.RobotRuns.FirstOrDefaultAsync(r => r.RunId == runId && r.RobotId == robot.Id);
-            if (run == null)
-                return NotFound($"Run with ID '{runId}' for robot '{robotKey}' not found.");
-
-            // If already completed, treat heartbeat as no-op (idempotent)
-            if (run.Outcome != null)
-                return NoContent();
-
-            var atUtc = request?.AtUtc?.ToUniversalTime() ?? DateTime.UtcNow;
-
-            // Guard against clock skew: never move backwards
-            if (run.LastHeartbeatUtc == null || atUtc > run.LastHeartbeatUtc.Value)
-                run.LastHeartbeatUtc = atUtc;
-
-            await _db.SaveChangesAsync();
+            var error = await _runsService.HeartbeatAsync(robotKey, runId, request);
+            if (!string.IsNullOrEmpty(error))
+                return BadRequest(error);
             return NoContent();
         }
-
 
         [HttpGet("{runId}/kpis")]
         public async Task<ActionResult<List<RunKpiMeasurementDto>>> GetAllKpisForRun([FromRoute] string robotKey, [FromRoute] string runId)
         {
-            robotKey = robotKey.Trim().ToLowerInvariant();
-            runId = runId.Trim();
-
-            var robot = await _db.Robots.FirstOrDefaultAsync(r => r.Key == robotKey);
-            if (robot == null) return NotFound($"Robot '{robotKey}' not found");
-
-            var run = await _db.RobotRuns.FirstOrDefaultAsync(r => r.RobotId == robot.Id && r.RunId == runId);
-            if (run == null) return NotFound($"Run '{runId}' not found for robot '{robotKey}'");
-
-            var result = await _db.RunEvents
-                .AsNoTracking()
-                .Where(e => e.RobotRunId == run.Id)
-                .OrderBy(e => e.CreatedUtc)
-                .SelectMany(e => e.KpiMeasurements.Select(m => new RunKpiMeasurementDto(
-                    EventId: e.Id,
-                    EventCreatedUtc: e.CreatedUtc,
-                    EventMessage: e.Message,
-
-                    KpiDefinitionId: m.KpiDefinitionId,
-                    KpiKey: m.KpiDefinition.Key,
-                    KpiName: m.KpiDefinition.Name,
-                    Unit: m.KpiDefinition.Unit,
-                    ValueType: m.ValueType,
-
-                    IntValue: m.IntValue,
-                    DecimalValue: m.DecimalValue,
-                    BoolValue: m.BoolValue,
-                    DurationMs: m.DurationMs,
-                    TextValue: m.TextValue
-                )))
-                .ToListAsync();
-
+            var result = await _runsService.GetAllKpisForRunAsync(robotKey, runId);
             return Ok(result);
         }
-
 
         [HttpGet]
         public async Task<ActionResult<List<RunListItemDto>>> ListRunsForRobot(
@@ -184,111 +60,18 @@ namespace KPIAPI.Controllers
             [FromQuery] DateTime? fromUtc = null,
             [FromQuery] int limit = 200,
             [FromQuery] string sort = "desc")
-                {
-                    robotKey = robotKey.Trim().ToLowerInvariant();
-                    limit = Math.Clamp(limit, 1, 2000);
-                    sort = (sort ?? "desc").Trim().ToLowerInvariant();
-
-                    var robot = await _db.Robots.AsNoTracking().FirstOrDefaultAsync(r => r.Key == robotKey);
-                    if (robot == null)
-                        return NotFound($"Robot '{robotKey}' not found");
-
-                    var runsQuery = _db.RobotRuns
-                        .AsNoTracking()
-                        .Where(r => r.RobotId == robot.Id);
-
-                    if (fromUtc != null)
-                    {
-                        var utc = fromUtc.Value.Kind == DateTimeKind.Unspecified
-                            ? DateTime.SpecifyKind(fromUtc.Value, DateTimeKind.Utc)
-                            : fromUtc.Value.ToUniversalTime();
-
-                        runsQuery = runsQuery.Where(r => r.StartTimeUtc >= utc);
-                    }
-
-                    runsQuery = sort == "asc"
-                        ? runsQuery.OrderBy(r => r.StartTimeUtc)
-                        : runsQuery.OrderByDescending(r => r.StartTimeUtc);
-
-                    var runs = await runsQuery
-                        .Take(limit)
-                        .Select(r => new
-                        {
-                            r.Id,
-                            r.RunId,
-                            r.StartTimeUtc,
-                            r.EndTimeUtc,
-                            r.Outcome
-                        })
-                        .ToListAsync();
-
-                    if (runs.Count == 0)
-                        return Ok(new List<RunListItemDto>());
-
-                    var runIds = runs.Select(r => r.Id).ToList();
-
-                    var eventCounts = await _db.RunEvents.AsNoTracking()
-                        .Where(e => runIds.Contains(e.RobotRunId))
-                        .GroupBy(e => e.RobotRunId)
-                        .Select(g => new { RunDbId = g.Key, Count = g.Count() })
-                        .ToDictionaryAsync(x => x.RunDbId, x => x.Count);
-
-                    var measurementCounts = await _db.KpiMeasurements.AsNoTracking()
-                        .Where(m => runIds.Contains(m.RunEvent.RobotRunId))
-                        .GroupBy(m => m.RunEvent.RobotRunId)
-                        .Select(g => new { RunDbId = g.Key, Count = g.Count() })
-                        .ToDictionaryAsync(x => x.RunDbId, x => x.Count);
-
-                    var result = runs.Select(r => new RunListItemDto(
-                        RunId: r.RunId,
-                        StartTimeUtc: r.StartTimeUtc,
-                        EndTimeUtc: r.EndTimeUtc,
-                        Outcome: r.Outcome,
-                        EventCount: eventCounts.TryGetValue(r.Id, out var ec) ? ec : 0,
-                        MeasurementCount: measurementCounts.TryGetValue(r.Id, out var mc) ? mc : 0
-                    )).ToList();
-
-                    return Ok(result);
+        {
+            var result = await _runsService.ListRunsForRobotAsync(robotKey, fromUtc, limit, sort);
+            return Ok(result);
         }
 
-
         [HttpGet("{runId}")]
-        public async Task<ActionResult<RunDetailsDto>> GetRun(
-            [FromRoute] string robotKey,
-            [FromRoute] string runId)
-                {
-                    robotKey = robotKey.Trim().ToLowerInvariant();
-                    runId = runId.Trim();
-
-                    var robot = await _db.Robots.AsNoTracking()
-                        .FirstOrDefaultAsync(r => r.Key == robotKey);
-
-                    if (robot == null)
-                        return NotFound($"Robot '{robotKey}' not found");
-
-                    var run = await _db.RobotRuns.AsNoTracking()
-                        .FirstOrDefaultAsync(r => r.RobotId == robot.Id && r.RunId == runId);
-
-                    if (run == null)
-                        return NotFound($"Run '{runId}' not found for robot '{robotKey}'");
-
-                    var eventCount = await _db.RunEvents.AsNoTracking()
-                        .CountAsync(e => e.RobotRunId == run.Id);
-
-                    var measurementCount = await _db.KpiMeasurements.AsNoTracking()
-                        .CountAsync(m => m.RunEvent.RobotRunId == run.Id);
-
-                    return Ok(new RunDetailsDto(
-                        RunId: run.RunId,
-                        StartTimeUtc: run.StartTimeUtc,
-                        EndTimeUtc: run.EndTimeUtc,
-                        LastHeartbeatUtc: run.LastHeartbeatUtc,
-                        Outcome: run.Outcome,
-                        ErrorCode: run.ErrorCode,
-                        ErrorMessage: run.ErrorMessage,
-                        EventCount: eventCount,
-                        MeasurementCount: measurementCount
-                    ));
+        public async Task<ActionResult<RunDetailsDto>> GetRun([FromRoute] string robotKey, [FromRoute] string runId)
+        {
+            var result = await _runsService.GetRunAsync(robotKey, runId);
+            if (result == null)
+                return NotFound($"Run '{runId}' not found for robot '{robotKey}'");
+            return Ok(result);
         }
     }
 }
