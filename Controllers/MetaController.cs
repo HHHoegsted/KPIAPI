@@ -1,5 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using KPIAPI.Domain.Enums;
+﻿    using Microsoft.AspNetCore.Mvc;
+using KPIAPI.Services;
 
 namespace KPIAPI.Controllers;
 
@@ -7,42 +7,22 @@ namespace KPIAPI.Controllers;
 [Route("api/meta")]
 public class MetaController : ControllerBase
 {
+    private readonly MetaService _metaService;
+
+    public MetaController(MetaService metaService)
+    {
+        _metaService = metaService;
+    }
+
     [HttpGet("enums/kpi-value-type")]
     public ActionResult GetKpiValueTypeEnum()
     {
-        var values = Enum.GetValues<KpiValueType>()
-            .Select(v => new
-            {
-                value = (int)v,
-                name = v.ToString()
-            })
-            .OrderBy(x => x.value)
-            .ToList();
-
-        return Ok(new
-        {
-            @enum = nameof(KpiValueType),
-            values
-        });
+        return Ok(_metaService.GetKpiValueTypeEnum());
     }
-
 
     [HttpGet("enums/run-outcome")]
     public ActionResult GetRunOutcomeEnum()
     {
-        var values = Enum.GetValues<RunOutcome>()
-            .Select(v => new
-            {
-                value = (int)v,
-                name = v.ToString()
-            })
-            .OrderBy(x => x.value)
-            .ToList();
-
-        return Ok(new
-        {
-            @enum = nameof(RunOutcome),
-            values
-        });
+        return Ok(_metaService.GetRunOutcomeEnum());
     }
 }
