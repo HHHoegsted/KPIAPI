@@ -1,5 +1,6 @@
 using KPIAPI.Data;
 using KPIAPI.Controllers;
+using KPIAPI.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,8 +14,9 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Register RobotService for dependency injection
+// Register services for dependency injection
 builder.Services.AddScoped<RobotService>();
+builder.Services.AddScoped<RunsService>();
 
 var app = builder.Build();
 
