@@ -17,6 +17,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Register services for dependency injection
 builder.Services.AddScoped<RobotService>();
 builder.Services.AddScoped<RunsService>();
+builder.Services.AddScoped<RunEventsService>();
+
 
 var app = builder.Build();
 
@@ -31,6 +33,3 @@ app.UseHttpsRedirection();
 app.MapControllers();
 
 app.Run();
-
-
-
