@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using KPIAPI.Data;
+using KPIAPI.Domain.Constants;
 
 namespace KPIAPI.Services
 {
@@ -12,9 +13,12 @@ namespace KPIAPI.Services
             _db = db;
         }
 
-        public async Task<object?> ListAsync(string robotKey, bool activeOnly)
+        public async Task<object?> ListAsync(string robotKey, bool activeOnly, bool developerMode = false)
         {
             robotKey = robotKey.Trim().ToLowerInvariant();
+
+            if (!developerMode && robotKey == SystemRobotKeys.DebugOnlyRobotKey)
+                return null;
 
             var robot = await _db.Robots.AsNoTracking().FirstOrDefaultAsync(r => r.Key == robotKey);
             if (robot == null)
