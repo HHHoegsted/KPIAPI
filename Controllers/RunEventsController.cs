@@ -38,8 +38,9 @@ public class RunEventsController : ControllerBase
     public async Task<IActionResult> GetEvent(
         [FromRoute] string robotKey,
         [FromRoute] string runId,
-        [FromRoute] int eventId)
+        [FromRoute] int eventId,
+        [FromQuery] bool developerMode = false)
     {
-        return await _runEventsService.GetEventAsync(robotKey, runId, eventId);
+        return await _runEventsService.GetEventAsync(robotKey, runId, eventId, developerMode);
     }
 }

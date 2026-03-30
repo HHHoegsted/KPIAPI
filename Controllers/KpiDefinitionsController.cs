@@ -17,9 +17,10 @@ public class KpiDefinitionsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult> List(
         [FromRoute] string robotKey,
-        [FromQuery] bool activeOnly = true)
+        [FromQuery] bool activeOnly = true,
+        [FromQuery] bool developerMode = false)
     {
-        var defs = await _kpiDefinitionsService.ListAsync(robotKey, activeOnly);
+        var defs = await _kpiDefinitionsService.ListAsync(robotKey, activeOnly, developerMode);
         if (defs == null)
             return NotFound($"Robot '{robotKey?.Trim().ToLowerInvariant()}' not found");
         return Ok(defs);
