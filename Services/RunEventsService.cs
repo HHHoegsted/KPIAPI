@@ -1,6 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.Text.Json;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using KPIAPI.Data;
+using KPIAPI.Domain.Constants;
 using KPIAPI.Domain.Entities;
 using KPIAPI.Domain.Enums;
 using KPIAPI.DTOs;
@@ -9,6 +11,8 @@ namespace KPIAPI.Services
 {
     public class RunEventsService
     {
+        private const string DebugModeKpiKey = "debug_mode";
+
         private readonly AppDbContext _db;
 
         public RunEventsService(AppDbContext db)
@@ -57,7 +61,10 @@ namespace KPIAPI.Services
             {
                 RobotRunId = run.Id,
                 CreatedUtc = createdUtc,
-                Message = string.IsNullOrWhiteSpace(request.Message) ? null : request.Message.Trim()
+                Message = string.IsNullOrWhiteSpace(request.Message) ? null : request.Message.Trim(),
+                EventType = string.IsNullOrWhiteSpace(request.EventType) ? "Info" : request.EventType.Trim(),
+                CorrelationKey = string.IsNullOrWhiteSpace(request.CorrelationKey) ? null : request.CorrelationKey.Trim(),
+                PayloadJson = request.Payload == null ? null : JsonSerializer.Serialize(request.Payload)
             };
 
             var newDefinitions = new List<KpiDefinition>();
@@ -88,13 +95,10 @@ namespace KPIAPI.Services
                     defByKey[key] = definition;
                     newDefinitions.Add(definition);
                 }
-                else
+                else if (definition.ValueType != kpi.ValueType)
                 {
-                    if (definition.ValueType != kpi.ValueType)
-                    {
-                        return new BadRequestObjectResult(
-                            $"KPI '{key}': ValueType mismatch. Existing={definition.ValueType}, Provided={kpi.ValueType}");
-                    }
+                    return new BadRequestObjectResult(
+                        $"KPI '{key}': ValueType mismatch. Existing={definition.ValueType}, Provided={kpi.ValueType}");
                 }
 
                 if (!IsValidValue(kpi))
@@ -127,10 +131,97 @@ namespace KPIAPI.Services
                 new { runEvent.Id });
         }
 
-        public async Task<IActionResult> GetEventAsync(string robotKey, string runId, int eventId)
+        public async Task<IActionResult> ListEventsAsync(
+            string robotKey,
+            string runId,
+            bool developerMode = false,
+            bool debugOnly = false)
         {
             robotKey = robotKey.Trim().ToLowerInvariant();
             runId = runId.Trim();
+
+            if (!developerMode && robotKey == SystemRobotKeys.DebugOnlyRobotKey)
+                return new NotFoundResult();
+
+            var robot = await _db.Robots
+                .AsNoTracking()
+                .FirstOrDefaultAsync(r => r.Key == robotKey);
+
+            if (robot == null)
+                return new NotFoundObjectResult($"Robot '{robotKey}' not found");
+
+            var run = await _db.RobotRuns
+                .AsNoTracking()
+                .FirstOrDefaultAsync(r => r.RobotId == robot.Id && r.RunId == runId);
+
+            if (run == null)
+                return new NotFoundObjectResult($"Run '{runId}' not found for robot '{robotKey}'");
+
+            var query = _db.RunEvents
+                .AsNoTracking()
+                .Include(e => e.KpiMeasurements)
+                    .ThenInclude(m => m.KpiDefinition)
+                .Where(e => e.RobotRunId == run.Id);
+
+            if (debugOnly)
+            {
+                query = query.Where(e => e.KpiMeasurements.Any(m =>
+                    m.KpiDefinition.Key == DebugModeKpiKey &&
+                    m.ValueType == KpiValueType.Boolean &&
+                    m.BoolValue == true));
+            }
+            else if (!developerMode)
+            {
+                query = query.Where(e => !e.KpiMeasurements.Any(m =>
+                    m.KpiDefinition.Key == DebugModeKpiKey &&
+                    m.ValueType == KpiValueType.Boolean &&
+                    m.BoolValue == true));
+            }
+
+            var events = await query
+                .OrderBy(e => e.CreatedUtc)
+                .ToListAsync();
+
+            var result = events
+                .Select(ev => new RunEventDto(
+                    EventId: ev.Id,
+                    CreatedUtc: ev.CreatedUtc,
+                    Message: ev.Message,
+                    EventType: ev.EventType,
+                    CorrelationKey: ev.CorrelationKey,
+                    PayloadJson: ev.PayloadJson,
+                    IsDebug: IsDebugEvent(ev),
+                    Kpis: ev.KpiMeasurements
+                        .OrderBy(m => m.KpiDefinition.Key)
+                        .Select(m => new RunKpiMeasurementDto(
+                            EventId: ev.Id,
+                            EventCreatedUtc: ev.CreatedUtc,
+                            EventMessage: ev.Message,
+                            KpiDefinitionId: m.KpiDefinitionId,
+                            KpiKey: m.KpiDefinition.Key,
+                            KpiName: m.KpiDefinition.Name,
+                            Unit: m.KpiDefinition.Unit,
+                            ValueType: m.ValueType,
+                            IntValue: m.IntValue,
+                            DecimalValue: m.DecimalValue,
+                            BoolValue: m.BoolValue,
+                            DurationMs: m.DurationMs,
+                            TextValue: m.TextValue
+                        ))
+                        .ToList()
+                ))
+                .ToList();
+
+            return new OkObjectResult(result);
+        }
+
+        public async Task<IActionResult> GetEventAsync(string robotKey, string runId, int eventId, bool developerMode = false)
+        {
+            robotKey = robotKey.Trim().ToLowerInvariant();
+            runId = runId.Trim();
+
+            if (!developerMode && robotKey == SystemRobotKeys.DebugOnlyRobotKey)
+                return new NotFoundResult();
 
             var robot = await _db.Robots.FirstOrDefaultAsync(r => r.Key == robotKey);
             if (robot == null) return new NotFoundResult();
@@ -145,7 +236,43 @@ namespace KPIAPI.Services
 
             if (ev == null) return new NotFoundResult();
 
-            return new OkObjectResult(ev);
+            var dto = new RunEventDto(
+                EventId: ev.Id,
+                CreatedUtc: ev.CreatedUtc,
+                Message: ev.Message,
+                EventType: ev.EventType,
+                CorrelationKey: ev.CorrelationKey,
+                PayloadJson: ev.PayloadJson,
+                IsDebug: IsDebugEvent(ev),
+                Kpis: ev.KpiMeasurements
+                    .OrderBy(m => m.KpiDefinition.Key)
+                    .Select(m => new RunKpiMeasurementDto(
+                        EventId: ev.Id,
+                        EventCreatedUtc: ev.CreatedUtc,
+                        EventMessage: ev.Message,
+                        KpiDefinitionId: m.KpiDefinitionId,
+                        KpiKey: m.KpiDefinition.Key,
+                        KpiName: m.KpiDefinition.Name,
+                        Unit: m.KpiDefinition.Unit,
+                        ValueType: m.ValueType,
+                        IntValue: m.IntValue,
+                        DecimalValue: m.DecimalValue,
+                        BoolValue: m.BoolValue,
+                        DurationMs: m.DurationMs,
+                        TextValue: m.TextValue
+                    ))
+                    .ToList()
+            );
+
+            return new OkObjectResult(dto);
+        }
+
+        private static bool IsDebugEvent(RunEvent ev)
+        {
+            return ev.KpiMeasurements.Any(m =>
+                m.KpiDefinition.Key == DebugModeKpiKey &&
+                m.ValueType == KpiValueType.Boolean &&
+                m.BoolValue == true);
         }
 
         private static bool IsValidValue(KPIDTO kpi)

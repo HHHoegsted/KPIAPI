@@ -1,12 +1,9 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using KPIAPI.DTOs;
 using KPIAPI.Data;
 using KPIAPI.Domain;
 using KPIAPI.Domain.Entities;
+using KPIAPI.Domain.Constants;
 
 public class RobotService
 {
@@ -62,9 +59,12 @@ public class RobotService
         };
     }
 
-    public async Task<List<object>> ListAsync(bool hasDataOnly)
+    public async Task<List<object>> ListAsync(bool hasDataOnly, bool developerMode = false)
     {
         var robotsQuery = _db.Robots.AsNoTracking();
+
+        if (!developerMode)
+            robotsQuery = robotsQuery.Where(r => r.Key != SystemRobotKeys.DebugOnlyRobotKey);
 
         if (!hasDataOnly)
         {
@@ -100,7 +100,7 @@ public class RobotService
         var lastSeenByRobotId = robotsWithLastSeen.ToDictionary(x => x.RobotId, x => x.LastSeenUtc);
         var robotIds = lastSeenByRobotId.Keys.ToList();
 
-        return await _db.Robots.AsNoTracking()
+        return await robotsQuery
             .Where(r => robotIds.Contains(r.Id))
             .OrderBy(r => r.Key)
             .Select(r => new
@@ -117,9 +117,16 @@ public class RobotService
             .ToListAsync();
     }
 
-    public async Task<RobotRunsPageSummaryDto?> GetRobotSummaryAsync(string robotKey, DateTime? fromUtc, DateTime? toUtc)
+    public async Task<RobotRunsPageSummaryDto?> GetRobotSummaryAsync(
+        string robotKey,
+        DateTime? fromUtc,
+        DateTime? toUtc,
+        bool developerMode = false)
     {
         robotKey = robotKey.Trim().ToLowerInvariant();
+
+        if (!developerMode && robotKey == SystemRobotKeys.DebugOnlyRobotKey)
+            return null;
 
         var robot = await _db.Robots.AsNoTracking().FirstOrDefaultAsync(r => r.Key == robotKey);
         if (robot == null)
