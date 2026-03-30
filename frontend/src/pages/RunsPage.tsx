@@ -148,6 +148,18 @@ export default function RunsPage() {
         load();
     }, [robotKey]);
 
+    useEffect(() => {
+        function handleDeveloperModeChanged() {
+            load();
+        }
+
+        window.addEventListener("developer-mode-changed", handleDeveloperModeChanged);
+
+        return () => {
+            window.removeEventListener("developer-mode-changed", handleDeveloperModeChanged);
+        };
+    }, [robotKey]);
+
     function goToRun(runId: string) {
         navigate(`/robots/${encodeURIComponent(robotKey)}/runs/${encodeURIComponent(runId)}`);
     }

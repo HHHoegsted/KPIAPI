@@ -187,6 +187,18 @@ export default function SingleRunPage() {
         load();
     }, [robotKey, runId]);
 
+    useEffect(() => {
+        function handleDeveloperModeChanged() {
+            load();
+        }
+
+        window.addEventListener("developer-mode-changed", handleDeveloperModeChanged);
+
+        return () => {
+            window.removeEventListener("developer-mode-changed", handleDeveloperModeChanged);
+        };
+    }, [robotKey, runId]);
+
     const aggregates = useMemo(() => aggregateRunKpis(rows), [rows]);
 
     const eventCount = useMemo(() => {
@@ -287,7 +299,6 @@ export default function SingleRunPage() {
                                     </div>
                                 )}
                             </td>
-
 
                             <td style={{ maxWidth: 320 }}>
                                 <KpiValueCell kpi={kpi} />
