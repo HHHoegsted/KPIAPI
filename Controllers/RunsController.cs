@@ -73,5 +73,19 @@ namespace KPIAPI.Controllers
                 return NotFound($"Run '{runId}' not found for robot '{robotKey}'");
             return Ok(result);
         }
+
+        [HttpDelete("{runId}")]
+        public async Task<IActionResult> DeleteRun(
+        [FromRoute] string robotKey,
+        [FromRoute] string runId,
+        [FromQuery] bool developerMode = false)
+        {
+            var error = await _runsService.DeleteAsync(robotKey, runId, developerMode);
+
+            if (!string.IsNullOrEmpty(error))
+                return BadRequest(error);
+
+            return NoContent();
+        }
     }
 }

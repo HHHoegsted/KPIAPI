@@ -263,5 +263,35 @@ namespace KPIAPI.Services
                 MeasurementCount: measurementCount
             );
         }
+
+        public async Task<string?> DeleteAsync(string robotKey, string runId, bool developerMode = false)
+        {
+            if (string.IsNullOrWhiteSpace(robotKey))
+                return "Robot key is required.";
+
+            if (string.IsNullOrWhiteSpace(runId))
+                return "Run ID is required.";
+
+            robotKey = robotKey.Trim().ToLowerInvariant();
+            runId = runId.Trim();
+
+            if (!developerMode && robotKey == SystemRobotKeys.DebugOnlyRobotKey)
+                return "Run deletion is only available in developer mode.";
+
+            var robot = await _db.Robots.FirstOrDefaultAsync(r => r.Key == robotKey);
+            if (robot == null)
+                return $"Robot with key '{robotKey}' not found.";
+
+            var run = await _db.RobotRuns
+                .FirstOrDefaultAsync(r => r.RobotId == robot.Id && r.RunId == runId);
+
+            if (run == null)
+                return $"Run with ID '{runId}' for robot '{robotKey}' not found.";
+
+            _db.RobotRuns.Remove(run);
+            await _db.SaveChangesAsync();
+
+            return null;
+        }
     }
 }
