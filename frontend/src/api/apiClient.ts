@@ -8,9 +8,22 @@ import type {
 } from "./types";
 
 const API_BASE = "";
+const DEV_MODE_STORAGE_KEY = "developerMode";
+
+function getDeveloperMode(): boolean {
+    return localStorage.getItem(DEV_MODE_STORAGE_KEY) === "true";
+}
+
+function withDeveloperMode(path: string): string {
+    const developerMode = getDeveloperMode();
+    if (!developerMode) return path;
+
+    const separator = path.includes("?") ? "&" : "?";
+    return `${path}${separator}developerMode=true`;
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-    const res = await fetch(`${API_BASE}${path}`, {
+    const res = await fetch(`${API_BASE}${withDeveloperMode(path)}`, {
         headers: {
             "Content-Type": "application/json",
             ...(init?.headers ?? {}),

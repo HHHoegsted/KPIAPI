@@ -24,12 +24,23 @@ public class RunEventsController : ControllerBase
         return await _runEventsService.RecordEventAsync(robotKey, runId, request);
     }
 
+    [HttpGet]
+    public async Task<IActionResult> List(
+        [FromRoute] string robotKey,
+        [FromRoute] string runId,
+        [FromQuery] bool developerMode = false,
+        [FromQuery] bool debugOnly = false)
+    {
+        return await _runEventsService.ListEventsAsync(robotKey, runId, developerMode, debugOnly);
+    }
+
     [HttpGet("{eventId:int}")]
     public async Task<IActionResult> GetEvent(
         [FromRoute] string robotKey,
         [FromRoute] string runId,
-        [FromRoute] int eventId)
+        [FromRoute] int eventId,
+        [FromQuery] bool developerMode = false)
     {
-        return await _runEventsService.GetEventAsync(robotKey, runId, eventId);
+        return await _runEventsService.GetEventAsync(robotKey, runId, eventId, developerMode);
     }
 }

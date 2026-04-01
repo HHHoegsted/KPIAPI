@@ -48,9 +48,12 @@ namespace KPIAPI.Controllers
         }
 
         [HttpGet("{runId}/kpis")]
-        public async Task<ActionResult<List<RunKpiMeasurementDto>>> GetAllKpisForRun([FromRoute] string robotKey, [FromRoute] string runId)
+        public async Task<ActionResult<List<RunKpiMeasurementDto>>> GetAllKpisForRun(
+            [FromRoute] string robotKey,
+            [FromRoute] string runId,
+            [FromQuery] bool developerMode = false)
         {
-            var result = await _runsService.GetAllKpisForRunAsync(robotKey, runId);
+            var result = await _runsService.GetAllKpisForRunAsync(robotKey, runId, developerMode);
             return Ok(result);
         }
 
@@ -59,16 +62,20 @@ namespace KPIAPI.Controllers
             [FromRoute] string robotKey,
             [FromQuery] DateTime? fromUtc = null,
             [FromQuery] int limit = 200,
-            [FromQuery] string sort = "desc")
+            [FromQuery] string sort = "desc",
+            [FromQuery] bool developerMode = false)
         {
-            var result = await _runsService.ListRunsForRobotAsync(robotKey, fromUtc, limit, sort);
+            var result = await _runsService.ListRunsForRobotAsync(robotKey, fromUtc, limit, sort, developerMode);
             return Ok(result);
         }
 
         [HttpGet("{runId}")]
-        public async Task<ActionResult<RunDetailsDto>> GetRun([FromRoute] string robotKey, [FromRoute] string runId)
+        public async Task<ActionResult<RunDetailsDto>> GetRun(
+            [FromRoute] string robotKey,
+            [FromRoute] string runId,
+            [FromQuery] bool developerMode = false)
         {
-            var result = await _runsService.GetRunAsync(robotKey, runId);
+            var result = await _runsService.GetRunAsync(robotKey, runId, developerMode);
             if (result == null)
                 return NotFound($"Run '{runId}' not found for robot '{robotKey}'");
             return Ok(result);

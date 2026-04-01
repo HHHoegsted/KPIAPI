@@ -1,5 +1,6 @@
 ﻿using KPIAPI.Data;
 using KPIAPI.Domain;
+using KPIAPI.Domain.Constants;
 using KPIAPI.Domain.Entities;
 using KPIAPI.DTOs;
 using Microsoft.EntityFrameworkCore;
@@ -114,7 +115,7 @@ namespace KPIAPI.Services
                 return $"Run with ID '{runId}' for robot '{robotKey}' not found.";
 
             if (run.Outcome != null)
-                return null; // No-op
+                return null;
 
             var atUtc = request?.AtUtc?.ToUniversalTime() ?? DateTime.UtcNow;
 
@@ -125,10 +126,16 @@ namespace KPIAPI.Services
             return null;
         }
 
-        public async Task<List<RunKpiMeasurementDto>> GetAllKpisForRunAsync(string robotKey, string runId)
+        public async Task<List<RunKpiMeasurementDto>> GetAllKpisForRunAsync(
+            string robotKey,
+            string runId,
+            bool developerMode = false)
         {
             robotKey = robotKey.Trim().ToLowerInvariant();
             runId = runId.Trim();
+
+            if (!developerMode && robotKey == SystemRobotKeys.DebugOnlyRobotKey)
+                return new List<RunKpiMeasurementDto>();
 
             var robot = await _db.Robots.FirstOrDefaultAsync(r => r.Key == robotKey);
             if (robot == null) return new List<RunKpiMeasurementDto>();
@@ -160,11 +167,19 @@ namespace KPIAPI.Services
             return result;
         }
 
-        public async Task<List<RunListItemDto>> ListRunsForRobotAsync(string robotKey, DateTime? fromUtc, int limit, string sort)
+        public async Task<List<RunListItemDto>> ListRunsForRobotAsync(
+            string robotKey,
+            DateTime? fromUtc,
+            int limit,
+            string sort,
+            bool developerMode = false)
         {
             robotKey = robotKey.Trim().ToLowerInvariant();
             limit = Math.Clamp(limit, 1, 2000);
             sort = (sort ?? "desc").Trim().ToLowerInvariant();
+
+            if (!developerMode && robotKey == SystemRobotKeys.DebugOnlyRobotKey)
+                return new List<RunListItemDto>();
 
             var robot = await _db.Robots.AsNoTracking().FirstOrDefaultAsync(r => r.Key == robotKey);
             if (robot == null)
@@ -228,10 +243,13 @@ namespace KPIAPI.Services
             return result;
         }
 
-        public async Task<RunDetailsDto?> GetRunAsync(string robotKey, string runId)
+        public async Task<RunDetailsDto?> GetRunAsync(string robotKey, string runId, bool developerMode = false)
         {
             robotKey = robotKey.Trim().ToLowerInvariant();
             runId = runId.Trim();
+
+            if (!developerMode && robotKey == SystemRobotKeys.DebugOnlyRobotKey)
+                return null;
 
             var robot = await _db.Robots.AsNoTracking()
                 .FirstOrDefaultAsync(r => r.Key == robotKey);
