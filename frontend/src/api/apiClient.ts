@@ -71,6 +71,12 @@ export const api = {
             `/api/robots/${encodeURIComponent(robotKey)}/runs/${encodeURIComponent(runId)}/kpis`
         ),
 
+    deleteRun: (robotKey: string, runId: string) =>
+        request<void>(
+            `/api/robots/${encodeURIComponent(robotKey)}/runs/${encodeURIComponent(runId)}`,
+            { method: "DELETE" }
+        ),
+
     listKpiDefinitions: (robotKey: string, activeOnly: boolean) =>
         request<KpiDefinition[]>(
             `/api/robots/${encodeURIComponent(robotKey)}/kpi-definitions?activeOnly=${activeOnly}`

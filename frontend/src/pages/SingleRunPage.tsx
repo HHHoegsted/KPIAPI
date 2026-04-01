@@ -1,4 +1,4 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/apiClient";
 import type { RunKpiMeasurementDto } from "../api/types";
@@ -157,7 +157,10 @@ function aggregateRunKpis(rows: RunKpiMeasurementDto[]): AggregatedRunKpi[] {
 }
 
 export default function SingleRunPage() {
+    const navigate = useNavigate();
     const { robotKey = "", runId = "" } = useParams();
+
+    const isDeveloperMode = localStorage.getItem("developerMode") === "true";
 
     const pageTitle = useMemo(() => {
         const robotTitle = inferTitleFromRobotKey(robotKey) ?? robotKey;
@@ -166,6 +169,7 @@ export default function SingleRunPage() {
 
     const [rows, setRows] = useState<RunKpiMeasurementDto[]>([]);
     const [loading, setLoading] = useState(false);
+    const [deleting, setDeleting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     async function load() {
@@ -183,20 +187,28 @@ export default function SingleRunPage() {
         }
     }
 
+    async function handleDeleteRun() {
+        const confirmed = window.confirm(
+            `Er du sikker på, at du vil slette denne kørsel?\n\n${runId}\n\nHandlingen kan ikke fortrydes.`
+        );
+
+        if (!confirmed) return;
+
+        setDeleting(true);
+        setError(null);
+
+        try {
+            await api.deleteRun(robotKey, runId);
+            navigate(`/robots/${encodeURIComponent(robotKey)}`);
+        } catch (e: unknown) {
+            setError(toErrorMessage(e));
+        } finally {
+            setDeleting(false);
+        }
+    }
+
     useEffect(() => {
         load();
-    }, [robotKey, runId]);
-
-    useEffect(() => {
-        function handleDeveloperModeChanged() {
-            load();
-        }
-
-        window.addEventListener("developer-mode-changed", handleDeveloperModeChanged);
-
-        return () => {
-            window.removeEventListener("developer-mode-changed", handleDeveloperModeChanged);
-        };
     }, [robotKey, runId]);
 
     const aggregates = useMemo(() => aggregateRunKpis(rows), [rows]);
@@ -244,9 +256,24 @@ export default function SingleRunPage() {
                     <Link className="btn-link btn-secondary" to={`/robots/${encodeURIComponent(robotKey)}`}>
                         Tilbage
                     </Link>
-                    <button onClick={load} disabled={loading}>
+
+                    <button onClick={load} disabled={loading || deleting}>
                         Opdater
                     </button>
+
+                    {isDeveloperMode && (
+                        <button
+                            onClick={handleDeleteRun}
+                            disabled={loading || deleting}
+                            style={{
+                                background: "#fff1f0",
+                                border: "1px solid #d92d20",
+                                color: "#b42318",
+                            }}
+                        >
+                            {deleting ? "Sletter…" : "Slet kørsel"}
+                        </button>
+                    )}
                 </div>
             </div>
 

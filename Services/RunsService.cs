@@ -284,6 +284,9 @@ namespace KPIAPI.Services
 
         public async Task<string?> DeleteAsync(string robotKey, string runId, bool developerMode = false)
         {
+            if (!developerMode)
+                return "Run deletion is only available in developer mode.";
+
             if (string.IsNullOrWhiteSpace(robotKey))
                 return "Robot key is required.";
 
