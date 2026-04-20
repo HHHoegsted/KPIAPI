@@ -20,6 +20,9 @@ builder.Services.AddScoped<RunEventsService>();
 builder.Services.AddScoped<MetaService>();
 builder.Services.AddScoped<KpiDefinitionsService>();
 
+// Register the heartbeat timeout service as a hosted service
+builder.Services.AddHostedService<RunHeartbeatTimeoutService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
