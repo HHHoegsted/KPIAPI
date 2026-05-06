@@ -1,3 +1,12 @@
+import {
+    LineChart,
+    Line,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    ResponsiveContainer,
+} from "recharts";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/apiClient";
@@ -146,6 +155,7 @@ export default function RunsPage() {
 
     useEffect(() => {
         load();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [robotKey]);
 
     useEffect(() => {
@@ -158,11 +168,24 @@ export default function RunsPage() {
         return () => {
             window.removeEventListener("developer-mode-changed", handleDeveloperModeChanged);
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [robotKey]);
 
     function goToRun(runId: string) {
         navigate(`/robots/${encodeURIComponent(robotKey)}/runs/${encodeURIComponent(runId)}`);
     }
+
+    // Prepare chart data from rows
+    const chartData = useMemo(
+        () =>
+            rows
+                .map((r) => ({
+                    date: r.startTimeUtc,
+                    antalBehandlede: r.eventCount,
+                }))
+                .reverse(), // oldest to newest
+        [rows]
+    );
 
     return (
         <>
@@ -267,6 +290,76 @@ export default function RunsPage() {
                     )}
                 </tbody>
             </table>
+
+            <div style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                marginBottom: 16,
+            }}>
+                <div>
+                    <h2>Antal behandlede pr. dato</h2>
+                </div>
+                <div>
+                    <button onClick={load} disabled={loading}>
+                        Opdater
+                    </button>
+                </div>
+            </div>
+
+            <LineChart
+                data={chartData}
+                height={200}
+                style={{
+                    marginBottom: 16,
+                }}
+            >
+                <Line
+                    type="monotone"
+                    dataKey="antalBehandlede"
+                    stroke="var(--primary-color)"
+                    strokeWidth={2}
+                />
+                <XAxis
+                    dataKey="date"
+                />
+                <YAxis />
+                <CartesianGrid
+                    stroke="var(--muted)"
+                    strokeDasharray="5 5"
+                />
+                <Tooltip formatter={(value) => value} />
+            </LineChart>
+
+            {/* Line chart for antalBehandlede (processed count) */}
+            {chartData.length > 10 && (
+                <div style={{ width: "100%", height: 260, marginBottom: 24 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={chartData} margin={{ top: 16, right: 24, left: 0, bottom: 8 }}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis
+                                dataKey="date"
+                                tickFormatter={(date) => fmtLocalDateDk(date)}
+                                minTickGap={24}
+                            />
+                            <YAxis allowDecimals={false} />
+                            <Tooltip
+                                labelFormatter={(date) => fmtLocalDateTimeDk(date)}
+                                formatter={(value) => [value ?? 0, "Antal behandlede"]}
+                            />
+                            <Line
+                                type="monotone"
+                                dataKey="antalBehandlede"
+                                stroke="#1976d2"
+                                strokeWidth={2}
+                                dot={{ r: 3 }}
+                                activeDot={{ r: 5 }}
+                            />
+                        </LineChart>
+                    </ResponsiveContainer>
+                </div>
+            )}
         </>
     );
 }
