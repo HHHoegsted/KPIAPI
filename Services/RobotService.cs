@@ -4,14 +4,17 @@ using KPIAPI.Data;
 using KPIAPI.Domain;
 using KPIAPI.Domain.Entities;
 using KPIAPI.Domain.Constants;
+using KPIAPI.Services;
 
 public class RobotService
 {
     private readonly AppDbContext _db;
+    private readonly ReportingRunsService _reportingRunsService;
 
-    public RobotService(AppDbContext db)
+    public RobotService(AppDbContext db, ReportingRunsService reportingRunsService)
     {
         _db = db;
+        _reportingRunsService = reportingRunsService;
     }
 
     public async Task<RobotUpsertResult> UpsertAsync(RobotUpsertRequest request)
@@ -132,50 +135,14 @@ public class RobotService
         if (robot == null)
             return null;
 
-        DateTime? from = null;
-        DateTime? to = null;
-
-        if (fromUtc != null)
-        {
-            from = fromUtc.Value.Kind == DateTimeKind.Unspecified
-                ? DateTime.SpecifyKind(fromUtc.Value, DateTimeKind.Utc)
-                : fromUtc.Value.ToUniversalTime();
-        }
-
-        if (toUtc != null)
-        {
-            to = toUtc.Value.Kind == DateTimeKind.Unspecified
-                ? DateTime.SpecifyKind(toUtc.Value, DateTimeKind.Utc)
-                : toUtc.Value.ToUniversalTime();
-        }
-
-        var runsQuery = _db.RobotRuns.AsNoTracking().Where(r => r.RobotId == robot.Id);
-
-        if (from != null) runsQuery = runsQuery.Where(r => r.StartTimeUtc >= from.Value);
-        if (to != null) runsQuery = runsQuery.Where(r => r.StartTimeUtc <= to.Value);
-
-        var runCount = await runsQuery.CountAsync();
-
-        var eventsQuery = _db.RunEvents.AsNoTracking()
-            .Where(e => e.RobotRun.RobotId == robot.Id);
-
-        if (from != null) eventsQuery = eventsQuery.Where(e => e.CreatedUtc >= from.Value);
-        if (to != null) eventsQuery = eventsQuery.Where(e => e.CreatedUtc <= to.Value);
-
-        var eventFacts = await eventsQuery
-            .Select(e => new { e.CreatedUtc })
-            .ToListAsync();
-
-        var eventCount = eventFacts.Count;
-        var firstEventUtc = eventCount == 0 ? null : eventFacts.Min(x => (DateTime?)x.CreatedUtc);
-        var lastEventUtc = eventCount == 0 ? null : eventFacts.Max(x => (DateTime?)x.CreatedUtc);
+        var slice = await _reportingRunsService.BuildAsync(robot, fromUtc, toUtc, "desc");
 
         return new RobotRunsPageSummaryDto(
             RobotKey: robotKey,
-            RunCount: runCount,
-            EventCount: eventCount,
-            FirstEventUtc: firstEventUtc,
-            LastEventUtc: lastEventUtc
+            RunCount: slice.RunCount,
+            EventCount: slice.EventCount,
+            FirstEventUtc: slice.FirstEventUtc,
+            LastEventUtc: slice.LastEventUtc
         );
     }
 }

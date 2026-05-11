@@ -44,13 +44,50 @@ export type RobotRunsPageSummaryDto = {
 
 export type RunOutcome = 1 | 2 | 3 | 4;
 
+export type LogicalRunOutcome = 0 | 1 | 2 | 3 | 4;
+
+export type ReportingRunKind = 1 | 2;
+
 export type RunListItemDto = {
+    kind: ReportingRunKind;
+    runId: string | null;
+    logicalRunId: number | null;
+    displayName: string | null;
+    startTimeUtc: string;
+    endTimeUtc: string | null;
+    physicalOutcome: RunOutcome | null;
+    logicalOutcome: LogicalRunOutcome | null;
+    attemptCount: number;
+    eventCount: number;
+    measurementCount: number;
+};
+
+export type LogicalRunAttemptDto = {
+    sortOrder: number;
     runId: string;
     startTimeUtc: string;
     endTimeUtc: string | null;
+    lastHeartbeatUtc: string | null;
     outcome: RunOutcome | null;
+    errorCode: string | null;
+    errorMessage: string | null;
     eventCount: number;
     measurementCount: number;
+};
+
+export type LogicalRunDetailsDto = {
+    logicalRunId: number;
+    robotKey: string;
+    displayName: string;
+    note: string | null;
+    createdUtc: string;
+    startTimeUtc: string | null;
+    endTimeUtc: string | null;
+    outcome: LogicalRunOutcome;
+    attemptCount: number;
+    eventCount: number;
+    measurementCount: number;
+    attempts: LogicalRunAttemptDto[];
 };
 
 export type RunKpiMeasurementDto = {

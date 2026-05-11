@@ -10,7 +10,12 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/apiClient";
-import type { RobotRunsPageSummaryDto, RunListItemDto } from "../api/types";
+import type {
+    LogicalRunOutcome,
+    RobotRunsPageSummaryDto,
+    RunListItemDto,
+    RunOutcome,
+} from "../api/types";
 
 function fmtLocalDateDk(isoUtc: string | null) {
     if (!isoUtc) return "—";
@@ -88,7 +93,7 @@ function inferTitleFromRobotKey(robotKey: string): string | null {
     return `${displayName} (${centerCode})`;
 }
 
-function outcomeClass(outcome: number | null) {
+function physicalOutcomeClass(outcome: RunOutcome | null) {
     switch (outcome) {
         case 1:
             return "run-row--succeeded";
@@ -103,7 +108,7 @@ function outcomeClass(outcome: number | null) {
     }
 }
 
-function runLabel(outcome: number | null): string {
+function physicalRunLabel(outcome: RunOutcome | null): string {
     switch (outcome) {
         case 1:
             return "Kørsel";
@@ -118,9 +123,59 @@ function runLabel(outcome: number | null): string {
     }
 }
 
+function logicalOutcomeClass(outcome: LogicalRunOutcome | null) {
+    switch (outcome) {
+        case 2:
+        case 3:
+            return "run-row--succeeded";
+        case 4:
+            return "run-row--failed";
+        case 1:
+            return "run-row--running";
+        default:
+            return "run-row--partial";
+    }
+}
+
+function logicalRunLabel(outcome: LogicalRunOutcome | null): string {
+    switch (outcome) {
+        case 1:
+            return "Logisk kørsel i gang";
+        case 2:
+            return "Logisk kørsel gennemført";
+        case 3:
+            return "Gennemført efter retry";
+        case 4:
+            return "Logisk kørsel fejlet";
+        default:
+            return "Logisk kørsel";
+    }
+}
+
+function rowClass(row: RunListItemDto) {
+    return row.kind === 2
+        ? logicalOutcomeClass(row.logicalOutcome)
+        : physicalOutcomeClass(row.physicalOutcome);
+}
+
+function rowLabel(row: RunListItemDto): string {
+    return row.kind === 2
+        ? logicalRunLabel(row.logicalOutcome)
+        : physicalRunLabel(row.physicalOutcome);
+}
+
+function rowKey(row: RunListItemDto): string {
+    return row.kind === 2
+        ? `logical-${row.logicalRunId}`
+        : `physical-${row.runId}`;
+}
+
 export default function RunsPage() {
     const navigate = useNavigate();
     const { robotKey = "" } = useParams();
+    const [isDeveloperMode, setIsDeveloperMode] = useState(
+        () => localStorage.getItem("developerMode") === "true"
+    );
 
     const pageTitle = useMemo(
         () => inferTitleFromRobotKey(robotKey) ?? "Robot-kørsler",
@@ -130,7 +185,11 @@ export default function RunsPage() {
     const [summary, setSummary] = useState<RobotRunsPageSummaryDto | null>(null);
     const [rows, setRows] = useState<RunListItemDto[]>([]);
     const [loading, setLoading] = useState(false);
+    const [creatingLogicalRun, setCreatingLogicalRun] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [selectedRunIds, setSelectedRunIds] = useState<string[]>([]);
+    const [logicalRunName, setLogicalRunName] = useState("");
+    const [logicalRunNote, setLogicalRunNote] = useState("");
 
     async function load() {
         setLoading(true);
@@ -160,6 +219,15 @@ export default function RunsPage() {
 
     useEffect(() => {
         function handleDeveloperModeChanged() {
+            const next = localStorage.getItem("developerMode") === "true";
+            setIsDeveloperMode(next);
+
+            if (!next) {
+                setSelectedRunIds([]);
+                setLogicalRunName("");
+                setLogicalRunNote("");
+            }
+
             load();
         }
 
@@ -171,8 +239,70 @@ export default function RunsPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [robotKey]);
 
-    function goToRun(runId: string) {
-        navigate(`/robots/${encodeURIComponent(robotKey)}/runs/${encodeURIComponent(runId)}`);
+    useEffect(() => {
+        const availableRunIds = new Set(
+            rows
+                .filter((row) => row.kind === 1 && row.runId)
+                .map((row) => row.runId as string)
+        );
+
+        setSelectedRunIds((current) => current.filter((runId) => availableRunIds.has(runId)));
+    }, [rows]);
+
+    function goToRow(row: RunListItemDto) {
+        if (row.kind === 2 && row.logicalRunId != null) {
+            navigate(
+                `/robots/${encodeURIComponent(robotKey)}/logical-runs/${encodeURIComponent(String(row.logicalRunId))}`
+            );
+            return;
+        }
+
+        if (row.runId) {
+            navigate(`/robots/${encodeURIComponent(robotKey)}/runs/${encodeURIComponent(row.runId)}`);
+        }
+    }
+
+    function toggleRunSelection(runId: string) {
+        setSelectedRunIds((current) =>
+            current.includes(runId)
+                ? current.filter((value) => value !== runId)
+                : [...current, runId]
+        );
+    }
+
+    async function handleCreateLogicalRun() {
+        if (selectedRunIds.length === 0) {
+            setError("Vælg mindst én fysisk kørsel først.");
+            return;
+        }
+
+        if (!logicalRunName.trim()) {
+            setError("Angiv et navn til den logiske kørsel.");
+            return;
+        }
+
+        setCreatingLogicalRun(true);
+        setError(null);
+
+        try {
+            const created = await api.createLogicalRun(robotKey, {
+                displayName: logicalRunName.trim(),
+                note: logicalRunNote.trim() || null,
+                runIds: selectedRunIds,
+            });
+
+            setSelectedRunIds([]);
+            setLogicalRunName("");
+            setLogicalRunNote("");
+
+            navigate(
+                `/robots/${encodeURIComponent(robotKey)}/logical-runs/${encodeURIComponent(String(created.logicalRunId))}`
+            );
+        } catch (e: unknown) {
+            setError(toErrorMessage(e));
+        } finally {
+            setCreatingLogicalRun(false);
+        }
     }
 
     // Prepare chart data from rows
@@ -245,6 +375,61 @@ export default function RunsPage() {
                 </div>
             )}
 
+            {isDeveloperMode && selectedRunIds.length > 0 && (
+                <div className="card" style={{ marginBottom: 16 }}>
+                    <div className="card-title">Opret logisk kørsel</div>
+                    <div style={{ color: "var(--muted)", marginBottom: 12 }}>
+                        {selectedRunIds.length} fysisk{selectedRunIds.length === 1 ? "" : "e"} kørsel
+                        {selectedRunIds.length === 1 ? " er " : "er "}valgt.
+                    </div>
+
+                    <div style={{ display: "grid", gap: 12 }}>
+                        <label style={{ display: "grid", gap: 6 }}>
+                            <span>Navn</span>
+                            <input
+                                value={logicalRunName}
+                                onChange={(e) => setLogicalRunName(e.target.value)}
+                                placeholder="Fx Fakturakørsel 2026-05-11"
+                                style={{ padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 6 }}
+                            />
+                        </label>
+
+                        <label style={{ display: "grid", gap: 6 }}>
+                            <span>Note</span>
+                            <textarea
+                                value={logicalRunNote}
+                                onChange={(e) => setLogicalRunNote(e.target.value)}
+                                rows={3}
+                                placeholder="Valgfri note"
+                                style={{ padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 6, resize: "vertical" }}
+                            />
+                        </label>
+
+                        <div style={{ color: "var(--muted)", fontSize: "0.92em" }}>
+                            {selectedRunIds.join(", ")}
+                        </div>
+
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            <button onClick={handleCreateLogicalRun} disabled={creatingLogicalRun || loading}>
+                                {creatingLogicalRun ? "Opretter…" : "Opret logisk kørsel"}
+                            </button>
+                            <button
+                                type="button"
+                                className="btn-secondary"
+                                onClick={() => {
+                                    setSelectedRunIds([]);
+                                    setLogicalRunName("");
+                                    setLogicalRunNote("");
+                                }}
+                                disabled={creatingLogicalRun}
+                            >
+                                Ryd valg
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {chartData.length > 10 && (
                 <div style={{ width: "100%", height: 260, marginBottom: 24 }}>
                     <ResponsiveContainer width="100%" height="100%">
@@ -276,9 +461,11 @@ export default function RunsPage() {
             <table className="robots-table">
                 <thead>
                     <tr>
-                        <th>Status</th>
+                        {isDeveloperMode && <th style={{ width: 52 }}>Vælg</th>}
+                        <th>Kørsel</th>
                         <th>Start</th>
                         <th>Slut</th>
+                        <th>Forsøg</th>
                         <th>Antal behandlede</th>
                     </tr>
                 </thead>
@@ -286,34 +473,55 @@ export default function RunsPage() {
                 <tbody>
                     {rows.map((r) => (
                         <tr
-                            key={r.runId}
-                            className={`${outcomeClass(r.outcome)} robots-row--link`}
-                            onClick={() => goToRun(r.runId)}
+                            key={rowKey(r)}
+                            className={`${rowClass(r)} robots-row--link`}
+                            onClick={() => goToRow(r)}
                             onKeyDown={(e) => {
                                 if (e.key === "Enter" || e.key === " ") {
                                     e.preventDefault();
-                                    goToRun(r.runId);
+                                    goToRow(r);
                                 }
                             }}
                             tabIndex={0}
                             role="link"
-                            aria-label={`Åbn kørsel ${r.runId}`}
+                            aria-label={
+                                r.kind === 2
+                                    ? `Åbn logisk kørsel ${r.displayName ?? r.logicalRunId}`
+                                    : `Åbn kørsel ${r.runId}`
+                            }
                         >
+                            {isDeveloperMode && (
+                                <td onClick={(e) => e.stopPropagation()}>
+                                    {r.kind === 1 && r.runId ? (
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedRunIds.includes(r.runId)}
+                                            onChange={() => toggleRunSelection(r.runId as string)}
+                                            aria-label={`Vælg kørsel ${r.runId}`}
+                                        />
+                                    ) : null}
+                                </td>
+                            )}
                             <td className="robots-col--name">
-                                <div style={{ fontWeight: 700 }}>{runLabel(r.outcome)}</div>
+                                <div style={{ fontWeight: 700 }}>
+                                    {r.kind === 2 ? r.displayName ?? rowLabel(r) : rowLabel(r)}
+                                </div>
                                 <div style={{ color: "var(--muted)", fontSize: "0.92em" }}>
-                                    {fmtLocalDateDk(r.startTimeUtc)}
+                                    {r.kind === 2
+                                        ? rowLabel(r)
+                                        : fmtLocalDateDk(r.startTimeUtc)}
                                 </div>
                             </td>
                             <td className="robots-col--time">{fmtLocalTimeDk(r.startTimeUtc)}</td>
                             <td className="robots-col--time">{fmtLocalTimeDk(r.endTimeUtc)}</td>
+                            <td>{r.attemptCount}</td>
                             <td>{r.eventCount}</td>
                         </tr>
                     ))}
 
                     {rows.length === 0 && !loading && (
                         <tr>
-                            <td colSpan={4}>Ingen kørsler fundet.</td>
+                            <td colSpan={isDeveloperMode ? 6 : 5}>Ingen kørsler fundet.</td>
                         </tr>
                     )}
                 </tbody>
