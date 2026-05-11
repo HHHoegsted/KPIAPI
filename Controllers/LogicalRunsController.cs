@@ -54,6 +54,16 @@ public class LogicalRunsController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("{logicalRunId:int}/kpis")]
+    public async Task<ActionResult<List<RunKpiMeasurementDto>>> GetAllKpisForLogicalRun(
+        [FromRoute] string robotKey,
+        [FromRoute] int logicalRunId,
+        [FromQuery] bool developerMode = false)
+    {
+        var result = await _logicalRunsService.GetAllKpisForLogicalRunAsync(robotKey, logicalRunId, developerMode);
+        return Ok(result);
+    }
+
     [HttpDelete("{logicalRunId:int}/attempts/{runId}")]
     public async Task<IActionResult> RemoveAttempt(
         [FromRoute] string robotKey,

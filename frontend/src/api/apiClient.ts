@@ -77,6 +77,11 @@ export const api = {
             `/api/robots/${encodeURIComponent(robotKey)}/logical-runs/${encodeURIComponent(logicalRunId)}`
         ),
 
+    getLogicalRunKpis: (robotKey: string, logicalRunId: string) =>
+        request<RunKpiMeasurementDto[]>(
+            `/api/robots/${encodeURIComponent(robotKey)}/logical-runs/${encodeURIComponent(logicalRunId)}/kpis`
+        ),
+
     createLogicalRun: (robotKey: string, input: { displayName: string; note?: string | null; runIds: string[] }) =>
         request<LogicalRunDetailsDto>(
             `/api/robots/${encodeURIComponent(robotKey)}/logical-runs`,

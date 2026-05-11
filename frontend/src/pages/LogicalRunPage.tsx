@@ -1,7 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/apiClient";
-import type { LogicalRunDetailsDto, LogicalRunOutcome, RunOutcome } from "../api/types";
+import type {
+    LogicalRunDetailsDto,
+    LogicalRunOutcome,
+    RunKpiMeasurementDto,
+    RunOutcome,
+} from "../api/types";
+import KpiValueCell from "./components/KpiValueCell";
+import { aggregateRunKpis } from "./components/aggregateRunKpis";
 
 function fmtLocalDateTimeDk(isoUtc: string | null) {
     if (!isoUtc) return "—";
@@ -68,6 +75,7 @@ export default function LogicalRunPage() {
     );
 
     const [details, setDetails] = useState<LogicalRunDetailsDto | null>(null);
+    const [kpiRows, setKpiRows] = useState<RunKpiMeasurementDto[]>([]);
     const [runIdsInput, setRunIdsInput] = useState("");
     const [loading, setLoading] = useState(false);
     const [mutating, setMutating] = useState(false);
@@ -78,11 +86,17 @@ export default function LogicalRunPage() {
         setError(null);
 
         try {
-            const data = await api.getLogicalRun(robotKey, logicalRunId);
-            setDetails(data);
+            const [detailsData, kpiData] = await Promise.all([
+                api.getLogicalRun(robotKey, logicalRunId),
+                api.getLogicalRunKpis(robotKey, logicalRunId),
+            ]);
+
+            setDetails(detailsData);
+            setKpiRows(kpiData);
         } catch (e: unknown) {
             setError(toErrorMessage(e));
             setDetails(null);
+            setKpiRows([]);
         } finally {
             setLoading(false);
         }
@@ -165,6 +179,8 @@ export default function LogicalRunPage() {
             setMutating(false);
         }
     }
+
+    const aggregates = useMemo(() => aggregateRunKpis(kpiRows), [kpiRows]);
 
     return (
         <>
@@ -250,6 +266,50 @@ export default function LogicalRunPage() {
                         </div>
                     )}
 
+                    <div className="card" style={{ marginBottom: 16, padding: 0 }}>
+                        <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)" }}>
+                            <div className="card-title" style={{ marginBottom: 0 }}>Samlede KPI'er</div>
+                        </div>
+
+                        <table className="robots-table">
+                            <thead>
+                                <tr>
+                                    <th>KPI</th>
+                                    <th>Værdi</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {aggregates.map((kpi) => (
+                                    <tr key={kpi.kpiDefinitionId}>
+                                        <td className="robots-col--name" style={{ verticalAlign: "top" }}>
+                                            <div style={{ fontWeight: 700 }}>{kpi.kpiName}</div>
+                                            {kpi.unit && (
+                                                <div style={{ color: "var(--muted)", fontSize: "0.92em" }}>
+                                                    {kpi.unit}
+                                                </div>
+                                            )}
+                                        </td>
+
+                                        <td style={{ maxWidth: 320 }}>
+                                            <KpiValueCell kpi={kpi} />
+                                        </td>
+                                    </tr>
+                                ))}
+
+                                {aggregates.length === 0 && !loading && (
+                                    <tr>
+                                        <td colSpan={2}>Ingen KPI-målinger fundet for denne logiske kørsel.</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div style={{ marginTop: -4, marginBottom: 16, color: "var(--muted)", fontSize: "0.92em" }}>
+                        {aggregates.length} KPI-typer fordelt på {details.measurementCount} målinger og {details.eventCount} behandlede.
+                    </div>
+
                     {isDeveloperMode && (
                         <div className="card" style={{ marginBottom: 16 }}>
                             <div className="card-title">Tilføj fysiske kørsler</div>
@@ -287,6 +347,11 @@ export default function LogicalRunPage() {
                             </div>
                         </div>
                     )}
+
+                    <div style={{ marginBottom: 8, fontWeight: 700 }}>Datakilder</div>
+                    <div style={{ color: "var(--muted)", marginBottom: 12, fontSize: "0.92em" }}>
+                        Disse fysiske kørsler indgår i den samlede KPI-visning ovenfor.
+                    </div>
 
                     <table className="robots-table">
                         <thead>

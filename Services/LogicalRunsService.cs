@@ -167,6 +167,61 @@ public class LogicalRunsService
         );
     }
 
+    public async Task<List<RunKpiMeasurementDto>> GetAllKpisForLogicalRunAsync(
+        string robotKey,
+        int logicalRunId,
+        bool developerMode = false)
+    {
+        robotKey = NormalizeRobotKey(robotKey);
+
+        if (!developerMode && robotKey == SystemRobotKeys.DebugOnlyRobotKey)
+            return new List<RunKpiMeasurementDto>();
+
+        var robot = await _db.Robots
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r => r.Key == robotKey);
+
+        if (robot == null)
+            return new List<RunKpiMeasurementDto>();
+
+        var logicalRunExists = await _db.LogicalRuns
+            .AsNoTracking()
+            .AnyAsync(lr => lr.Id == logicalRunId && lr.RobotId == robot.Id);
+
+        if (!logicalRunExists)
+            return new List<RunKpiMeasurementDto>();
+
+        var runDbIds = await _db.LogicalRunAttempts
+            .AsNoTracking()
+            .Where(a => a.LogicalRunId == logicalRunId)
+            .Select(a => a.RobotRunId)
+            .ToListAsync();
+
+        if (runDbIds.Count == 0)
+            return new List<RunKpiMeasurementDto>();
+
+        return await _db.RunEvents
+            .AsNoTracking()
+            .Where(e => runDbIds.Contains(e.RobotRunId))
+            .OrderBy(e => e.CreatedUtc)
+            .SelectMany(e => e.KpiMeasurements.Select(m => new RunKpiMeasurementDto(
+                EventId: e.Id,
+                EventCreatedUtc: e.CreatedUtc,
+                EventMessage: e.Message,
+                KpiDefinitionId: m.KpiDefinitionId,
+                KpiKey: m.KpiDefinition.Key,
+                KpiName: m.KpiDefinition.Name,
+                Unit: m.KpiDefinition.Unit,
+                ValueType: m.ValueType,
+                IntValue: m.IntValue,
+                DecimalValue: m.DecimalValue,
+                BoolValue: m.BoolValue,
+                DurationMs: m.DurationMs,
+                TextValue: m.TextValue
+            )))
+            .ToListAsync();
+    }
+
     public async Task<string?> RemoveAttemptAsync(
         string robotKey,
         int logicalRunId,
