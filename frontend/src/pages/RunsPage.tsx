@@ -60,6 +60,15 @@ function fmtLocalTimeDk(isoUtc: string | null) {
     }).format(d);
 }
 
+function defaultLogicalRunName() {
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, "0");
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const year = String(now.getFullYear()).slice(-2);
+
+    return `Samlet kørsel ${day}${month}${year}`;
+}
+
 function toErrorMessage(e: unknown): string {
     if (e instanceof Error) return e.message;
     if (typeof e === "string") return e;
@@ -188,7 +197,7 @@ export default function RunsPage() {
     const [creatingLogicalRun, setCreatingLogicalRun] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [selectedRunIds, setSelectedRunIds] = useState<string[]>([]);
-    const [logicalRunName, setLogicalRunName] = useState("");
+    const [logicalRunName, setLogicalRunName] = useState(() => defaultLogicalRunName());
     const [logicalRunNote, setLogicalRunNote] = useState("");
 
     async function load() {
@@ -224,7 +233,7 @@ export default function RunsPage() {
 
             if (!next) {
                 setSelectedRunIds([]);
-                setLogicalRunName("");
+                setLogicalRunName(defaultLogicalRunName());
                 setLogicalRunNote("");
             }
 
@@ -292,7 +301,7 @@ export default function RunsPage() {
             });
 
             setSelectedRunIds([]);
-            setLogicalRunName("");
+            setLogicalRunName(defaultLogicalRunName());
             setLogicalRunNote("");
 
             navigate(
@@ -418,7 +427,7 @@ export default function RunsPage() {
                                 className="btn-secondary"
                                 onClick={() => {
                                     setSelectedRunIds([]);
-                                    setLogicalRunName("");
+                                    setLogicalRunName(defaultLogicalRunName());
                                     setLogicalRunNote("");
                                 }}
                                 disabled={creatingLogicalRun}
