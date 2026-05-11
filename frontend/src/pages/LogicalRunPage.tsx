@@ -180,7 +180,6 @@ export default function LogicalRunPage() {
                 <div>
                     <h1 style={{ marginBottom: 4 }}>{details?.displayName ?? "Logisk kørsel"}</h1>
                     <div style={{ color: "var(--muted)" }}>{robotKey}</div>
-                    <div style={{ color: "var(--muted)" }}>Logical run #{logicalRunId}</div>
                 </div>
 
                 <div style={{ display: "flex", gap: 8 }}>
@@ -293,12 +292,12 @@ export default function LogicalRunPage() {
                         <thead>
                             <tr>
                                 <th>Forsøg</th>
-                                <th>Run ID</th>
                                 <th>Status</th>
                                 <th>Start</th>
                                 <th>Slut</th>
                                 <th>Behandlede</th>
                                 <th>Målinger</th>
+                                <th>Detaljer</th>
                                 {isDeveloperMode && <th>Handling</th>}
                             </tr>
                         </thead>
@@ -307,14 +306,6 @@ export default function LogicalRunPage() {
                             {details.attempts.map((attempt) => (
                                 <tr key={attempt.runId}>
                                     <td>{attempt.sortOrder}</td>
-                                    <td>
-                                        <Link
-                                            to={`/robots/${encodeURIComponent(robotKey)}/runs/${encodeURIComponent(attempt.runId)}`}
-                                            style={{ color: "var(--link)", textDecoration: "underline" }}
-                                        >
-                                            {attempt.runId}
-                                        </Link>
-                                    </td>
                                     <td>
                                         <div>{physicalOutcomeLabel(attempt.outcome)}</div>
                                         {attempt.errorMessage && (
@@ -327,6 +318,14 @@ export default function LogicalRunPage() {
                                     <td>{fmtLocalDateTimeDk(attempt.endTimeUtc)}</td>
                                     <td>{attempt.eventCount}</td>
                                     <td>{attempt.measurementCount}</td>
+                                    <td>
+                                        <Link
+                                            to={`/robots/${encodeURIComponent(robotKey)}/runs/${encodeURIComponent(attempt.runId)}`}
+                                            style={{ color: "var(--link)", textDecoration: "underline" }}
+                                        >
+                                            Åbn fysisk kørsel
+                                        </Link>
+                                    </td>
                                     {isDeveloperMode && (
                                         <td>
                                             <button
