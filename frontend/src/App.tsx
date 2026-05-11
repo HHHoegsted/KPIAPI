@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import RobotsPage from "./pages/RobotsPage";
 import RunsPage from "./pages/RunsPage";
 import SingleRunPage from "./pages/SingleRunPage";
+import LogicalRunPage from "./pages/LogicalRunPage";
 
 const LOGO_FILE = "HK_LOGO_LOGO_BLÅ_150x45px.png";
 const logoSrc = new URL(`./assets/logos/${LOGO_FILE}`, import.meta.url).href;
@@ -197,6 +198,7 @@ export default function App() {
                 <Route path="/" element={<RobotsPage />} />
                 <Route path="/robots/:robotKey" element={<RunsPage />} />
                 <Route path="/robots/:robotKey/runs/:runId" element={<SingleRunPage />} />
+                <Route path="/robots/:robotKey/logical-runs/:logicalRunId" element={<LogicalRunPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
         </Routes>

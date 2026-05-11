@@ -16,6 +16,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Register services for dependency injection
 builder.Services.AddScoped<RobotService>();
 builder.Services.AddScoped<RunsService>();
+builder.Services.AddScoped<LogicalRunsService>();
+builder.Services.AddScoped<ReportingRunsService>();
 builder.Services.AddScoped<RunEventsService>();
 builder.Services.AddScoped<MetaService>();
 builder.Services.AddScoped<KpiDefinitionsService>();

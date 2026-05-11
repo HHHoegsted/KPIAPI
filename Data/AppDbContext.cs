@@ -9,6 +9,8 @@ public class AppDbContext : DbContext
 
     public DbSet<Robot> Robots => Set<Robot>();
     public DbSet<RobotRun> RobotRuns => Set<RobotRun>();
+    public DbSet<LogicalRun> LogicalRuns => Set<LogicalRun>();
+    public DbSet<LogicalRunAttempt> LogicalRunAttempts => Set<LogicalRunAttempt>();
     public DbSet<RunEvent> RunEvents => Set<RunEvent>();
     public DbSet<KpiDefinition> KpiDefinitions => Set<KpiDefinition>();
     public DbSet<KpiMeasurement> KpiMeasurements => Set<KpiMeasurement>();
@@ -31,6 +33,16 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<RobotRun>()
             .HasIndex(r => new { r.RobotId, r.StartTimeUtc });
 
+        modelBuilder.Entity<LogicalRunAttempt>()
+            .HasIndex(a => a.RobotRunId)
+            .IsUnique();
+
+        modelBuilder.Entity<LogicalRun>()
+            .HasIndex(lr => new { lr.RobotId, lr.CreatedUtc });
+
+        modelBuilder.Entity<LogicalRunAttempt>()
+            .HasIndex(a => new { a.LogicalRunId, a.SortOrder });
+
         modelBuilder.Entity<KpiMeasurement>()
             .HasIndex(m => new { m.RunEventId, m.KpiDefinitionId });
 
@@ -43,6 +55,12 @@ public class AppDbContext : DbContext
             .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<Robot>()
+            .HasMany(r => r.LogicalRuns)
+            .WithOne(lr => lr.Robot)
+            .HasForeignKey(lr => lr.RobotId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Robot>()
             .HasMany(r => r.KpiDefinitions)
             .WithOne(d => d.Robot)
             .HasForeignKey(d => d.RobotId)
@@ -52,6 +70,18 @@ public class AppDbContext : DbContext
             .HasMany(r => r.Events)
             .WithOne(e => e.RobotRun)
             .HasForeignKey(e => e.RobotRunId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<RobotRun>()
+            .HasOne(r => r.LogicalRunAttempt)
+            .WithOne(a => a.RobotRun)
+            .HasForeignKey<LogicalRunAttempt>(a => a.RobotRunId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<LogicalRun>()
+            .HasMany(lr => lr.Attempts)
+            .WithOne(a => a.LogicalRun)
+            .HasForeignKey(a => a.LogicalRunId)
             .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<RunEvent>()

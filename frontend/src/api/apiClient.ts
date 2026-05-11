@@ -1,6 +1,7 @@
 import type {
     EnumResponse,
     KpiDefinition,
+    LogicalRunDetailsDto,
     RobotListItem,
     RobotRunsPageSummaryDto,
     RunKpiMeasurementDto,
@@ -69,6 +70,41 @@ export const api = {
     getRunKpis: (robotKey: string, runId: string) =>
         request<RunKpiMeasurementDto[]>(
             `/api/robots/${encodeURIComponent(robotKey)}/runs/${encodeURIComponent(runId)}/kpis`
+        ),
+
+    getLogicalRun: (robotKey: string, logicalRunId: string) =>
+        request<LogicalRunDetailsDto>(
+            `/api/robots/${encodeURIComponent(robotKey)}/logical-runs/${encodeURIComponent(logicalRunId)}`
+        ),
+
+    createLogicalRun: (robotKey: string, input: { displayName: string; note?: string | null; runIds: string[] }) =>
+        request<LogicalRunDetailsDto>(
+            `/api/robots/${encodeURIComponent(robotKey)}/logical-runs`,
+            {
+                method: "POST",
+                body: JSON.stringify(input),
+            }
+        ),
+
+    addLogicalRunAttempts: (robotKey: string, logicalRunId: string, runIds: string[]) =>
+        request<LogicalRunDetailsDto>(
+            `/api/robots/${encodeURIComponent(robotKey)}/logical-runs/${encodeURIComponent(logicalRunId)}/attempts`,
+            {
+                method: "POST",
+                body: JSON.stringify({ runIds }),
+            }
+        ),
+
+    deleteLogicalRun: (robotKey: string, logicalRunId: string) =>
+        request<void>(
+            `/api/robots/${encodeURIComponent(robotKey)}/logical-runs/${encodeURIComponent(logicalRunId)}`,
+            { method: "DELETE" }
+        ),
+
+    removeLogicalRunAttempt: (robotKey: string, logicalRunId: string, runId: string) =>
+        request<void>(
+            `/api/robots/${encodeURIComponent(robotKey)}/logical-runs/${encodeURIComponent(logicalRunId)}/attempts/${encodeURIComponent(runId)}`,
+            { method: "DELETE" }
         ),
 
     deleteRun: (robotKey: string, runId: string) =>

@@ -3,10 +3,15 @@
 namespace KPIAPI.DTOs
 {
     public record RunListItemDto(
-        string RunId,
+        ReportingRunKind Kind,
+        string? RunId,
+        int? LogicalRunId,
+        string? DisplayName,
         DateTime StartTimeUtc,
         DateTime? EndTimeUtc,
-        RunOutcome? Outcome,
+        RunOutcome? PhysicalOutcome,
+        LogicalRunOutcome? LogicalOutcome,
+        int AttemptCount,
         int EventCount,
         int MeasurementCount
     );

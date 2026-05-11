@@ -27,8 +27,10 @@ namespace KPIAPI.Domain.Entities
         public string? ErrorMessage { get; set; }
 
         //Navigation properties
-        
+
         public List<RunEvent> Events { get; set; } = new();
+
+        public LogicalRunAttempt? LogicalRunAttempt { get; set; }
 
         public Robot Robot { get; set; } = null!;
     }

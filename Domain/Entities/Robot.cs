@@ -21,6 +21,7 @@ namespace KPIAPI.Domain.Entities
 
         //Navigation properties
         public List<RobotRun> Runs { get; set; } = new();
+        public List<LogicalRun> LogicalRuns { get; set; } = new();
         public List<KpiDefinition> KpiDefinitions { get; set; } = new();
     }
 }
