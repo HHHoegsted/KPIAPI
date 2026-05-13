@@ -60,6 +60,17 @@ function fmtLocalTimeDk(isoUtc: string | null) {
     }).format(d);
 }
 
+function fmtTimeSavedDuration(totalSecondsValue: number | null) {
+    if (totalSecondsValue == null) return "—";
+
+    const totalSeconds = Math.max(0, Math.floor(totalSecondsValue));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
 function defaultLogicalRunName() {
     const now = new Date();
     const day = String(now.getDate()).padStart(2, "0");
@@ -373,12 +384,12 @@ export default function RunsPage() {
                     </div>
 
                     <div className="card">
-                        <div className="card-title">Først behandlet</div>
-                        <div>{fmtLocalDateTimeDk(summary.firstEventUtc)}</div>
+                        <div className="card-title">Total tid sparet</div>
+                        <div>{fmtTimeSavedDuration(summary.totalTimeSavedSeconds)}</div>
                     </div>
 
                     <div className="card">
-                        <div className="card-title">Senest behandlet</div>
+                        <div className="card-title">Senest set</div>
                         <div>{fmtLocalDateTimeDk(summary.lastEventUtc)}</div>
                     </div>
                 </div>
