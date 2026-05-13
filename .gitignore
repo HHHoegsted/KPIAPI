@@ -240,7 +240,7 @@ ClientBin/
 *.publishsettings
 orleans.codegen.cs
 .env
-.github/logical_runs.instructions.md
+.github/*.instructions.md
 
 
 # Including strong name files can present a security risk
