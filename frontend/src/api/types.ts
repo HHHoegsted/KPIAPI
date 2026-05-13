@@ -38,6 +38,7 @@ export type RobotRunsPageSummaryDto = {
     robotKey: string;
     runCount: number;
     eventCount: number;
+    totalTimeSavedSeconds: number;
     firstEventUtc: string | null;
     lastEventUtc: string | null;
 };

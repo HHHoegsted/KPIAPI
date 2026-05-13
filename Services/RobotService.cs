@@ -136,11 +136,27 @@ public class RobotService
             return null;
 
         var slice = await _reportingRunsService.BuildAsync(robot, fromUtc, toUtc, "desc");
+        var timeSavedQuery = _db.KpiMeasurements
+            .AsNoTracking()
+            .Where(m =>
+                m.RunEvent.RobotRun.RobotId == robot.Id &&
+                m.KpiDefinition.Key == "time_saved" &&
+                m.IntValue != null);
+
+        if (fromUtc.HasValue)
+            timeSavedQuery = timeSavedQuery.Where(m => m.RecordedUtc >= fromUtc.Value);
+
+        if (toUtc.HasValue)
+            timeSavedQuery = timeSavedQuery.Where(m => m.RecordedUtc <= toUtc.Value);
+
+        var totalTimeSavedSeconds = await timeSavedQuery
+            .SumAsync(m => (long?)m.IntValue) ?? 0;
 
         return new RobotRunsPageSummaryDto(
             RobotKey: robotKey,
             RunCount: slice.RunCount,
             EventCount: slice.EventCount,
+            TotalTimeSavedSeconds: totalTimeSavedSeconds,
             FirstEventUtc: slice.FirstEventUtc,
             LastEventUtc: slice.LastEventUtc
         );
