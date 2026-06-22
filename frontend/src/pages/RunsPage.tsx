@@ -329,11 +329,12 @@ export default function RunsPage() {
     const chartData = useMemo(
         () =>
             rows
+                .slice(0, 20)
                 .map((r) => ({
                     date: r.startTimeUtc,
                     antalBehandlede: r.eventCount,
                 }))
-                .reverse(), // oldest to newest
+                .reverse(), // oldest to newest within the latest 20 runs
         [rows]
     );
 
