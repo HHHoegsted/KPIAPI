@@ -169,26 +169,28 @@ namespace KPIAPI.Services
             return result;
         }
 
-        public async Task<List<RunListItemDto>> ListRunsForRobotAsync(
+        public async Task<PaginatedRunListDto> ListRunsForRobotAsync(
             string robotKey,
             DateTime? fromUtc,
             int limit,
+            int offset,
             string sort,
             bool developerMode = false)
         {
             robotKey = robotKey.Trim().ToLowerInvariant();
             limit = Math.Clamp(limit, 1, 2000);
+            offset = Math.Max(0, offset);
             sort = (sort ?? "desc").Trim().ToLowerInvariant();
 
             if (!developerMode && robotKey == SystemRobotKeys.DebugOnlyRobotKey)
-                return new List<RunListItemDto>();
+                return new PaginatedRunListDto(new List<RunListItemDto>(), 0, offset, limit);
 
             var robot = await _db.Robots.AsNoTracking().FirstOrDefaultAsync(r => r.Key == robotKey);
             if (robot == null)
-                return new List<RunListItemDto>();
+                return new PaginatedRunListDto(new List<RunListItemDto>(), 0, offset, limit);
 
-            var slice = await _reportingRunsService.BuildAsync(robot, fromUtc, null, sort, limit);
-            return slice.Items;
+            var slice = await _reportingRunsService.BuildAsync(robot, fromUtc, null, sort, limit, offset);
+            return new PaginatedRunListDto(slice.Items, slice.RunCount, offset, limit);
         }
 
         public async Task<RunDetailsDto?> GetRunAsync(string robotKey, string runId, bool developerMode = false)
