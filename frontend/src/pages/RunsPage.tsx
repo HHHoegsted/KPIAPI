@@ -17,6 +17,11 @@ import type {
     RunOutcome,
 } from "../api/types";
 
+const ALL_PAGE_SIZE = 2000;
+const CHART_RUN_LIMIT = 20;
+
+type PageSizeOption = 10 | 25 | 50 | "all";
+
 function fmtLocalDateDk(isoUtc: string | null) {
     if (!isoUtc) return "—";
 
@@ -204,29 +209,45 @@ export default function RunsPage() {
 
     const [summary, setSummary] = useState<RobotRunsPageSummaryDto | null>(null);
     const [rows, setRows] = useState<RunListItemDto[]>([]);
+    const [chartRows, setChartRows] = useState<RunListItemDto[]>([]);
+    const [totalCount, setTotalCount] = useState(0);
     const [loading, setLoading] = useState(false);
     const [creatingLogicalRun, setCreatingLogicalRun] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [selectedRunIds, setSelectedRunIds] = useState<string[]>([]);
     const [logicalRunName, setLogicalRunName] = useState(() => defaultLogicalRunName());
     const [logicalRunNote, setLogicalRunNote] = useState("");
+    const [pageSize, setPageSize] = useState<PageSizeOption>(25);
+    const [pageIndex, setPageIndex] = useState(0);
+
+    const pageLimit = pageSize === "all" ? ALL_PAGE_SIZE : pageSize;
+    const pageOffset = pageSize === "all" ? 0 : pageIndex * pageSize;
+    const canGoPrevious = pageSize !== "all" && pageIndex > 0;
+    const canGoNext = pageSize !== "all" && pageOffset + rows.length < totalCount;
+    const showingFrom = totalCount === 0 ? 0 : pageOffset + 1;
+    const showingTo = totalCount === 0 ? 0 : pageOffset + rows.length;
 
     async function load() {
         setLoading(true);
         setError(null);
 
         try {
-            const [summaryData, runData] = await Promise.all([
+            const [summaryData, chartRunData, runData] = await Promise.all([
                 api.getRobotSummary(robotKey),
-                api.listRuns(robotKey, 200, "desc"),
+                api.listRuns(robotKey, CHART_RUN_LIMIT, "desc", 0),
+                api.listRuns(robotKey, pageLimit, "desc", pageOffset),
             ]);
 
             setSummary(summaryData);
-            setRows(runData);
+            setChartRows(chartRunData.items);
+            setRows(runData.items);
+            setTotalCount(runData.totalCount);
         } catch (e: unknown) {
             setError(toErrorMessage(e));
             setSummary(null);
             setRows([]);
+            setChartRows([]);
+            setTotalCount(0);
         } finally {
             setLoading(false);
         }
@@ -235,6 +256,10 @@ export default function RunsPage() {
     useEffect(() => {
         load();
         // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [robotKey, pageSize, pageIndex]);
+
+    useEffect(() => {
+        setPageIndex(0);
     }, [robotKey]);
 
     useEffect(() => {
@@ -325,17 +350,16 @@ export default function RunsPage() {
         }
     }
 
-    // Prepare chart data from rows
+    // Prepare chart data from the latest runs overall
     const chartData = useMemo(
         () =>
-            rows
-                .slice(0, 20)
+            chartRows
                 .map((r) => ({
                     date: r.startTimeUtc,
                     antalBehandlede: r.eventCount,
                 }))
                 .reverse(), // oldest to newest within the latest 20 runs
-        [rows]
+        [chartRows]
     );
 
     return (
@@ -478,6 +502,63 @@ export default function RunsPage() {
                     </ResponsiveContainer>
                 </div>
             )}
+
+            <div
+                style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    marginBottom: 12,
+                    flexWrap: "wrap",
+                }}
+            >
+                <div style={{ color: "var(--muted)" }}>
+                    Viser {showingFrom}-{showingTo} af {totalCount} kørsler
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span>Side længde</span>
+                        <select
+                            value={String(pageSize)}
+                            onChange={(e) => {
+                                const nextValue = e.target.value === "all"
+                                    ? "all"
+                                    : (Number(e.target.value) as Exclude<PageSizeOption, "all">);
+
+                                setPageSize(nextValue);
+                                setPageIndex(0);
+                            }}
+                            style={{ padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 6 }}
+                        >
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                            <option value="all">Alle (max 2000)</option>
+                        </select>
+                    </label>
+
+                    <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                            type="button"
+                            className="btn-secondary"
+                            onClick={() => setPageIndex((current) => Math.max(0, current - 1))}
+                            disabled={!canGoPrevious || loading}
+                        >
+                            Forrige
+                        </button>
+                        <button
+                            type="button"
+                            className="btn-secondary"
+                            onClick={() => setPageIndex((current) => current + 1)}
+                            disabled={!canGoNext || loading}
+                        >
+                            Næste
+                        </button>
+                    </div>
+                </div>
+            </div>
 
             <table className="robots-table">
                 <thead>

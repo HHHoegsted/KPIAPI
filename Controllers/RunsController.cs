@@ -58,14 +58,15 @@ namespace KPIAPI.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<List<RunListItemDto>>> ListRunsForRobot(
+        public async Task<ActionResult<PaginatedRunListDto>> ListRunsForRobot(
             [FromRoute] string robotKey,
             [FromQuery] DateTime? fromUtc = null,
             [FromQuery] int limit = 200,
+            [FromQuery] int offset = 0,
             [FromQuery] string sort = "desc",
             [FromQuery] bool developerMode = false)
         {
-            var result = await _runsService.ListRunsForRobotAsync(robotKey, fromUtc, limit, sort, developerMode);
+            var result = await _runsService.ListRunsForRobotAsync(robotKey, fromUtc, limit, offset, sort, developerMode);
             return Ok(result);
         }
 

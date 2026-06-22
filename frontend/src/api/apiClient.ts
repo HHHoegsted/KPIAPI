@@ -2,10 +2,10 @@ import type {
     EnumResponse,
     KpiDefinition,
     LogicalRunDetailsDto,
+    PaginatedRunListDto,
     RobotListItem,
     RobotRunsPageSummaryDto,
     RunKpiMeasurementDto,
-    RunListItemDto,
 } from "./types";
 
 const API_BASE = "";
@@ -57,12 +57,13 @@ export const api = {
         );
     },
 
-    listRuns: (robotKey: string, limit = 200, sort: "asc" | "desc" = "desc") => {
+    listRuns: (robotKey: string, limit = 200, sort: "asc" | "desc" = "desc", offset = 0) => {
         const qs = new URLSearchParams();
         qs.set("limit", String(limit));
+        qs.set("offset", String(offset));
         qs.set("sort", sort);
 
-        return request<RunListItemDto[]>(
+        return request<PaginatedRunListDto>(
             `/api/robots/${encodeURIComponent(robotKey)}/runs?${qs.toString()}`
         );
     },

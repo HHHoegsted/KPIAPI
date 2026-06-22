@@ -63,6 +63,13 @@ export type RunListItemDto = {
     measurementCount: number;
 };
 
+export type PaginatedRunListDto = {
+    items: RunListItemDto[];
+    totalCount: number;
+    offset: number;
+    limit: number;
+};
+
 export type LogicalRunAttemptDto = {
     sortOrder: number;
     runId: string;

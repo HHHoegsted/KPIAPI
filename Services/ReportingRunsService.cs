@@ -20,7 +20,8 @@ public class ReportingRunsService
         DateTime? fromUtc,
         DateTime? toUtc,
         string sort,
-        int? limit = null)
+        int? limit = null,
+        int offset = 0)
     {
         var from = NormalizeUtc(fromUtc);
         var to = NormalizeUtc(toUtc);
@@ -163,6 +164,11 @@ public class ReportingRunsService
             ? reportingRows.OrderBy(r => r.StartTimeUtc).ToList()
             : reportingRows.OrderByDescending(r => r.StartTimeUtc).ToList();
 
+        var totalRunCount = reportingRows.Count;
+
+        if (offset > 0)
+            reportingRows = reportingRows.Skip(offset).ToList();
+
         if (limit is > 0)
             reportingRows = reportingRows.Take(limit.Value).ToList();
 
@@ -184,7 +190,7 @@ public class ReportingRunsService
 
         return new ReportingRunSlice(
             reportingRows,
-            reportingRows.Count,
+            totalRunCount,
             eventCount,
             firstEventUtc,
             lastEventUtc
