@@ -121,10 +121,10 @@ public class RobotService
     }
 
     public async Task<RobotRunsPageSummaryDto?> GetRobotSummaryAsync(
-        string robotKey,
-        DateTime? fromUtc,
-        DateTime? toUtc,
-        bool developerMode = false)
+    string robotKey,
+    DateTime? fromUtc,
+    DateTime? toUtc,
+    bool developerMode = false)
     {
         robotKey = robotKey.Trim().ToLowerInvariant();
 
@@ -132,10 +132,12 @@ public class RobotService
             return null;
 
         var robot = await _db.Robots.AsNoTracking().FirstOrDefaultAsync(r => r.Key == robotKey);
+
         if (robot == null)
             return null;
 
-        var slice = await _reportingRunsService.BuildAsync(robot, fromUtc, toUtc, "desc");
+        var slice = await _reportingRunsService.BuildSummaryAsync(robot, fromUtc, toUtc);
+
         var timeSavedQuery = _db.KpiMeasurements
             .AsNoTracking()
             .Where(m =>
@@ -149,8 +151,7 @@ public class RobotService
         if (toUtc.HasValue)
             timeSavedQuery = timeSavedQuery.Where(m => m.RecordedUtc <= toUtc.Value);
 
-        var totalTimeSavedSeconds = await timeSavedQuery
-            .SumAsync(m => (long?)m.IntValue) ?? 0;
+        var totalTimeSavedSeconds = await timeSavedQuery.SumAsync(m => (long?)m.IntValue) ?? 0;
 
         return new RobotRunsPageSummaryDto(
             RobotKey: robotKey,

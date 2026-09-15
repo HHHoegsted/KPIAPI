@@ -61,7 +61,7 @@ namespace KPIAPI.Controllers
         public async Task<ActionResult<PaginatedRunListDto>> ListRunsForRobot(
             [FromRoute] string robotKey,
             [FromQuery] DateTime? fromUtc = null,
-            [FromQuery] int limit = 200,
+            [FromQuery] int limit = 25,
             [FromQuery] int offset = 0,
             [FromQuery] string sort = "desc",
             [FromQuery] bool developerMode = false)
