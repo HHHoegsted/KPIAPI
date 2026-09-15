@@ -1,10 +1,10 @@
-using Microsoft.EntityFrameworkCore;
-using KPIAPI.DTOs;
 using KPIAPI.Data;
 using KPIAPI.Domain;
-using KPIAPI.Domain.Entities;
 using KPIAPI.Domain.Constants;
+using KPIAPI.Domain.Entities;
+using KPIAPI.DTOs;
 using KPIAPI.Services;
+using Microsoft.EntityFrameworkCore;
 
 public class RobotService
 {
@@ -41,6 +41,7 @@ public class RobotService
                 IsActive = true,
                 CreatedUtc = DateTime.UtcNow
             };
+
             _db.Robots.Add(robot);
         }
         else
@@ -120,11 +121,29 @@ public class RobotService
             .ToListAsync();
     }
 
+    public async Task<RobotsSummaryDto> GetSummaryAsync(bool developerMode = false)
+    {
+        var timeSavedQuery = _db.KpiMeasurements
+            .AsNoTracking()
+            .Where(m =>
+                m.KpiDefinition.Key == "time_saved" &&
+                m.IntValue != null);
+
+        if (!developerMode)
+            timeSavedQuery = timeSavedQuery.Where(m => m.RunEvent.RobotRun.Robot.Key != SystemRobotKeys.DebugOnlyRobotKey);
+
+        var totalTimeSavedSeconds = await timeSavedQuery.SumAsync(m => (long?)m.IntValue) ?? 0;
+
+        return new RobotsSummaryDto(
+            TotalTimeSavedSeconds: totalTimeSavedSeconds
+        );
+    }
+
     public async Task<RobotRunsPageSummaryDto?> GetRobotSummaryAsync(
-    string robotKey,
-    DateTime? fromUtc,
-    DateTime? toUtc,
-    bool developerMode = false)
+        string robotKey,
+        DateTime? fromUtc,
+        DateTime? toUtc,
+        bool developerMode = false)
     {
         robotKey = robotKey.Trim().ToLowerInvariant();
 

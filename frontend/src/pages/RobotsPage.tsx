@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/apiClient";
-import type { RobotListItem } from "../api/types";
+import type { RobotListItem, RobotsSummaryDto } from "../api/types";
+import { formatTimeSavedDuration } from "../utils/formatTimeSavedDuration";
 
 const DEV_MODE_STORAGE_KEY = "developerMode";
 
@@ -9,9 +10,11 @@ function getDeveloperMode(): boolean {
     return localStorage.getItem(DEV_MODE_STORAGE_KEY) === "true";
 }
 
-function fmtLocalDk(isoUtc: string | null) {
+function fmtLocalDk(isoUtc: string | null): string {
     if (!isoUtc) return "—";
+
     const d = new Date(isoUtc);
+
     if (Number.isNaN(d.getTime())) return isoUtc;
 
     return new Intl.DateTimeFormat("da-DK", {
@@ -27,6 +30,7 @@ function fmtLocalDk(isoUtc: string | null) {
 function toErrorMessage(e: unknown): string {
     if (e instanceof Error) return e.message;
     if (typeof e === "string") return e;
+
     try {
         return JSON.stringify(e);
     } catch {
@@ -40,6 +44,7 @@ export default function RobotsPage() {
     const [developerMode, setDeveloperMode] = useState<boolean>(() => getDeveloperMode());
     const [hasDataOnly, setHasDataOnly] = useState(() => !getDeveloperMode());
     const [rows, setRows] = useState<RobotListItem[]>([]);
+    const [summary, setSummary] = useState<RobotsSummaryDto | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -48,35 +53,51 @@ export default function RobotsPage() {
 
         const sorted = [...rows].sort((a, b) => {
             const c = norm(a.centerCode).localeCompare(norm(b.centerCode), "da");
+
             if (c !== 0) return c;
 
             const d = norm(a.displayName).localeCompare(norm(b.displayName), "da");
+
             if (d !== 0) return d;
 
             return norm(a.key).localeCompare(norm(b.key), "da");
         });
 
         const groups: Array<{ centerCode: string; items: RobotListItem[] }> = [];
+
         for (const r of sorted) {
             const center = (r.centerCode ?? "").trim() || "Ukendt";
             const last = groups[groups.length - 1];
+
             if (!last || last.centerCode !== center) {
-                groups.push({ centerCode: center, items: [r] });
+                groups.push({
+                    centerCode: center,
+                    items: [r],
+                });
             } else {
                 last.items.push(r);
             }
         }
+
         return groups;
     }, [rows]);
 
     async function load() {
         setLoading(true);
         setError(null);
+
         try {
-            const data = await api.listRobots(hasDataOnly);
-            setRows(data);
+            const [robotData, summaryData] = await Promise.all([
+                api.listRobots(hasDataOnly),
+                api.getRobotsSummary(),
+            ]);
+
+            setRows(robotData);
+            setSummary(summaryData);
         } catch (e: unknown) {
             setError(toErrorMessage(e));
+            setRows([]);
+            setSummary(null);
         } finally {
             setLoading(false);
         }
@@ -85,6 +106,7 @@ export default function RobotsPage() {
     useEffect(() => {
         function handleDeveloperModeChanged() {
             const nextDeveloperMode = getDeveloperMode();
+
             setDeveloperMode(nextDeveloperMode);
 
             if (nextDeveloperMode) {
@@ -112,7 +134,16 @@ export default function RobotsPage() {
 
     return (
         <div style={{ padding: 16, maxWidth: 1100, margin: "0 auto" }}>
-            <h1 style={{ marginBottom: 8 }}>Robotter</h1>
+            <h1 style={{ marginBottom: 16 }}>Robotter</h1>
+
+            {summary && (
+                <div className="card" style={{ marginBottom: 16 }}>
+                    <div className="card-title">Total tid sparet</div>
+                    <div style={{ fontSize: "1.4rem", fontWeight: 700 }}>
+                        {formatTimeSavedDuration(summary.totalTimeSavedSeconds)}
+                    </div>
+                </div>
+            )}
 
             <div
                 style={{
@@ -122,7 +153,14 @@ export default function RobotsPage() {
                     marginBottom: 12,
                 }}
             >
-                <label htmlFor="hasDataOnly" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <label
+                    htmlFor="hasDataOnly"
+                    style={{
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "center",
+                    }}
+                >
                     <input
                         id="hasDataOnly"
                         type="checkbox"
@@ -132,8 +170,15 @@ export default function RobotsPage() {
                     Kun med data
                 </label>
 
-                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                <div
+                    style={{
+                        display: "flex",
+                        gap: 12,
+                        alignItems: "center",
+                    }}
+                >
                     {loading && <span>Indlæser…</span>}
+
                     <button onClick={load} disabled={loading}>
                         Opdater
                     </button>
@@ -141,7 +186,13 @@ export default function RobotsPage() {
             </div>
 
             {error && (
-                <div style={{ padding: 12, border: "1px solid #c00", marginBottom: 12 }}>
+                <div
+                    style={{
+                        padding: 12,
+                        border: "1px solid #c00",
+                        marginBottom: 12,
+                    }}
+                >
                     <strong>Fejl:</strong> {error}
                 </div>
             )}
@@ -170,7 +221,14 @@ export default function RobotsPage() {
                                     }}
                                 >
                                     {g.centerCode.toUpperCase()}
-                                    <span style={{ color: "var(--muted)", fontWeight: 700, marginLeft: 10 }}>
+
+                                    <span
+                                        style={{
+                                            color: "var(--muted)",
+                                            fontWeight: 700,
+                                            marginLeft: 10,
+                                        }}
+                                    >
                                         ({g.items.length})
                                     </span>
                                 </td>
@@ -191,8 +249,13 @@ export default function RobotsPage() {
                                     role="link"
                                     aria-label={`Åbn dashboard for ${r.displayName} (${r.centerCode})`}
                                 >
-                                    <td className="robots-col--name">{r.displayName}</td>
-                                    <td className="robots-col--time">{fmtLocalDk(r.lastSeenUtc)}</td>
+                                    <td className="robots-col--name">
+                                        {r.displayName}
+                                    </td>
+
+                                    <td className="robots-col--time">
+                                        {fmtLocalDk(r.lastSeenUtc)}
+                                    </td>
                                 </tr>
                             ))}
                         </Fragment>
