@@ -125,3 +125,7 @@ export type EnumResponse = {
     enum: string;
     values: EnumValue[];
 };
+
+export type RobotsSummaryDto = {
+    totalTimeSavedSeconds: number;
+};

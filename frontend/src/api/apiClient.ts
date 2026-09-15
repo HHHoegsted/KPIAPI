@@ -5,6 +5,7 @@ import type {
     PaginatedRunListDto,
     RobotListItem,
     RobotRunsPageSummaryDto,
+    RobotsSummaryDto,
     RunKpiMeasurementDto,
 } from "./types";
 
@@ -17,9 +18,11 @@ function getDeveloperMode(): boolean {
 
 function withDeveloperMode(path: string): string {
     const developerMode = getDeveloperMode();
+
     if (!developerMode) return path;
 
     const separator = path.includes("?") ? "&" : "?";
+
     return `${path}${separator}developerMode=true`;
 }
 
@@ -34,6 +37,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
     if (!res.ok) {
         const text = await res.text().catch(() => "");
+
         throw new Error(text || `HTTP ${res.status} ${res.statusText}`);
     }
 
@@ -46,10 +50,15 @@ export const api = {
     listRobots: (hasDataOnly: boolean) =>
         request<RobotListItem[]>(`/api/robots?hasDataOnly=${hasDataOnly}`),
 
+    getRobotsSummary: () =>
+        request<RobotsSummaryDto>("/api/robots/summary"),
+
     getRobotSummary: (robotKey: string, fromUtcIso?: string, toUtcIso?: string) => {
         const qs = new URLSearchParams();
+
         if (fromUtcIso) qs.set("fromUtc", fromUtcIso);
         if (toUtcIso) qs.set("toUtc", toUtcIso);
+
         const q = qs.toString();
 
         return request<RobotRunsPageSummaryDto>(
@@ -57,8 +66,9 @@ export const api = {
         );
     },
 
-    listRuns: (robotKey: string, limit = 200, sort: "asc" | "desc" = "desc", offset = 0) => {
+    listRuns: (robotKey: string, limit = 25, sort: "asc" | "desc" = "desc", offset = 0) => {
         const qs = new URLSearchParams();
+
         qs.set("limit", String(limit));
         qs.set("offset", String(offset));
         qs.set("sort", sort);
@@ -124,5 +134,6 @@ export const api = {
             `/api/robots/${encodeURIComponent(robotKey)}/kpi-definitions?activeOnly=${activeOnly}`
         ),
 
-    getKpiValueTypeEnum: () => request<EnumResponse>(`/api/meta/enums/kpi-value-type`),
+    getKpiValueTypeEnum: () =>
+        request<EnumResponse>("/api/meta/enums/kpi-value-type"),
 };
