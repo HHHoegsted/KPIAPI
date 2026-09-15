@@ -15,17 +15,156 @@ public class ReportingRunsService
         _db = db;
     }
 
-    public async Task<ReportingRunSlice> BuildAsync(
+    public async Task<ReportingRunSlice> BuildPageAsync(
         Robot robot,
         DateTime? fromUtc,
-        DateTime? toUtc,
         string sort,
-        int? limit = null,
-        int offset = 0)
+        int limit,
+        int offset)
+    {
+        var reportingRows = await BuildReportingRowsAsync(robot, fromUtc, null);
+
+        reportingRows = sort == "asc"
+            ? reportingRows.OrderBy(r => r.StartTimeUtc).ToList()
+            : reportingRows.OrderByDescending(r => r.StartTimeUtc).ToList();
+
+        var totalRunCount = reportingRows.Count;
+
+        var pageRows = reportingRows
+            .Skip(offset)
+            .Take(limit)
+            .ToList();
+
+        if (pageRows.Count == 0)
+            return new ReportingRunSlice(new List<RunListItemDto>(), totalRunCount, 0, null, null);
+
+        var selectedRunDbIds = pageRows
+            .SelectMany(r => r.PhysicalRunIds)
+            .Distinct()
+            .ToList();
+
+        var eventFacts = await _db.RunEvents
+            .AsNoTracking()
+            .Where(e => selectedRunDbIds.Contains(e.RobotRunId))
+            .GroupBy(e => e.RobotRunId)
+            .Select(g => new
+            {
+                RunDbId = g.Key,
+                Count = g.Count(),
+                FirstEventUtc = (DateTime?)g.Min(e => e.CreatedUtc),
+                LastEventUtc = (DateTime?)g.Max(e => e.CreatedUtc)
+            })
+            .ToDictionaryAsync(
+                x => x.RunDbId,
+                x => new EventStat(x.Count, x.FirstEventUtc, x.LastEventUtc));
+
+        var measurementCounts = await _db.KpiMeasurements
+            .AsNoTracking()
+            .Where(m => selectedRunDbIds.Contains(m.RunEvent.RobotRunId))
+            .GroupBy(m => m.RunEvent.RobotRunId)
+            .Select(g => new
+            {
+                RunDbId = g.Key,
+                Count = g.Count()
+            })
+            .ToDictionaryAsync(x => x.RunDbId, x => x.Count);
+
+        var items = pageRows
+            .Select(row => new RunListItemDto(
+                Kind: row.Kind,
+                RunId: row.RunId,
+                LogicalRunId: row.LogicalRunId,
+                DisplayName: row.DisplayName,
+                StartTimeUtc: row.StartTimeUtc,
+                EndTimeUtc: row.EndTimeUtc,
+                PhysicalOutcome: row.PhysicalOutcome,
+                LogicalOutcome: row.LogicalOutcome,
+                AttemptCount: row.AttemptCount,
+                EventCount: row.PhysicalRunIds.Sum(id => eventFacts.GetValueOrDefault(id)?.Count ?? 0),
+                MeasurementCount: row.PhysicalRunIds.Sum(id => measurementCounts.GetValueOrDefault(id))
+            ))
+            .ToList();
+
+        var selectedEventStats = selectedRunDbIds
+            .Select(id => eventFacts.GetValueOrDefault(id))
+            .Where(stat => stat != null)
+            .Cast<EventStat>()
+            .ToList();
+
+        var eventCount = selectedEventStats.Sum(stat => stat.Count);
+
+        var firstEventUtc = selectedEventStats
+            .Where(stat => stat.FirstEventUtc != null)
+            .Select(stat => stat.FirstEventUtc)
+            .DefaultIfEmpty(null)
+            .Min();
+
+        var lastEventUtc = selectedEventStats
+            .Where(stat => stat.LastEventUtc != null)
+            .Select(stat => stat.LastEventUtc)
+            .DefaultIfEmpty(null)
+            .Max();
+
+        return new ReportingRunSlice(
+            items,
+            totalRunCount,
+            eventCount,
+            firstEventUtc,
+            lastEventUtc
+        );
+    }
+
+    public async Task<ReportingRunSlice> BuildSummaryAsync(
+        Robot robot,
+        DateTime? fromUtc,
+        DateTime? toUtc)
+    {
+        var reportingRows = await BuildReportingRowsAsync(robot, fromUtc, toUtc);
+
+        if (reportingRows.Count == 0)
+            return new ReportingRunSlice(new List<RunListItemDto>(), 0, 0, null, null);
+
+        var includedRunDbIds = reportingRows
+            .SelectMany(r => r.PhysicalRunIds)
+            .Distinct()
+            .ToList();
+
+        var eventQuery = _db.RunEvents
+            .AsNoTracking()
+            .Where(e => includedRunDbIds.Contains(e.RobotRunId));
+
+        var eventCount = await eventQuery.CountAsync();
+
+        DateTime? firstEventUtc = null;
+        DateTime? lastEventUtc = null;
+
+        if (eventCount > 0)
+        {
+            firstEventUtc = await eventQuery
+                .Select(e => (DateTime?)e.CreatedUtc)
+                .MinAsync();
+
+            lastEventUtc = await eventQuery
+                .Select(e => (DateTime?)e.CreatedUtc)
+                .MaxAsync();
+        }
+
+        return new ReportingRunSlice(
+            new List<RunListItemDto>(),
+            reportingRows.Count,
+            eventCount,
+            firstEventUtc,
+            lastEventUtc
+        );
+    }
+
+    private async Task<List<ReportingRowFact>> BuildReportingRowsAsync(
+        Robot robot,
+        DateTime? fromUtc,
+        DateTime? toUtc)
     {
         var from = NormalizeUtc(fromUtc);
         var to = NormalizeUtc(toUtc);
-        sort = (sort ?? "desc").Trim().ToLowerInvariant();
 
         var runFacts = await _db.RobotRuns
             .AsNoTracking()
@@ -40,76 +179,56 @@ public class ReportingRunsService
             .ToListAsync();
 
         if (runFacts.Count == 0)
-            return new ReportingRunSlice(new List<RunListItemDto>(), 0, 0, null, null);
+            return new List<ReportingRowFact>();
 
-        var runDbIds = runFacts.Select(r => r.Id).ToList();
-
-        var eventFacts = await _db.RunEvents
-            .AsNoTracking()
-            .Where(e => runDbIds.Contains(e.RobotRunId))
-            .GroupBy(e => e.RobotRunId)
-            .Select(g => new
-            {
-                RunDbId = g.Key,
-                Count = g.Count(),
-                FirstEventUtc = (DateTime?)g.Min(x => x.CreatedUtc),
-                LastEventUtc = (DateTime?)g.Max(x => x.CreatedUtc)
-            })
-            .ToDictionaryAsync(
-                x => x.RunDbId,
-                x => new EventStat(x.Count, x.FirstEventUtc, x.LastEventUtc));
-
-        var measurementCounts = await _db.KpiMeasurements
-            .AsNoTracking()
-            .Where(m => runDbIds.Contains(m.RunEvent.RobotRunId))
-            .GroupBy(m => m.RunEvent.RobotRunId)
-            .Select(g => new { RunDbId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.RunDbId, x => x.Count);
-
-        var runDetails = runFacts
-            .Select(r => new PhysicalRunDetail(
-                r.Id,
-                r.RunId,
-                r.StartTimeUtc,
-                r.EndTimeUtc,
-                r.Outcome,
-                eventFacts.TryGetValue(r.Id, out var eventStat) ? eventStat.Count : 0,
-                measurementCounts.TryGetValue(r.Id, out var measurementCount) ? measurementCount : 0,
-                eventFacts.TryGetValue(r.Id, out eventStat) ? eventStat.FirstEventUtc : null,
-                eventFacts.TryGetValue(r.Id, out eventStat) ? eventStat.LastEventUtc : null
-            ))
-            .ToDictionary(r => r.Id);
+        var runFactsById = runFacts.ToDictionary(r => r.Id);
 
         var logicalRuns = await _db.LogicalRuns
             .AsNoTracking()
             .Where(lr => lr.RobotId == robot.Id)
-            .Select(lr => new LogicalRunFact(lr.Id, lr.DisplayName, lr.CreatedUtc))
+            .Select(lr => new LogicalRunFact(
+                lr.Id,
+                lr.DisplayName
+            ))
             .ToListAsync();
 
-        var logicalRunIds = logicalRuns.Select(lr => lr.Id).ToList();
+        var logicalRunIds = logicalRuns
+            .Select(lr => lr.Id)
+            .ToList();
+
         var attemptFacts = logicalRunIds.Count == 0
             ? new List<LogicalRunAttemptFact>()
             : await _db.LogicalRunAttempts
                 .AsNoTracking()
                 .Where(a => logicalRunIds.Contains(a.LogicalRunId))
-                .Select(a => new LogicalRunAttemptFact(a.LogicalRunId, a.RobotRunId, a.SortOrder))
+                .Select(a => new LogicalRunAttemptFact(
+                    a.LogicalRunId,
+                    a.RobotRunId,
+                    a.SortOrder
+                ))
                 .ToListAsync();
+
+        var attemptsByLogicalRunId = attemptFacts
+            .GroupBy(a => a.LogicalRunId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderBy(a => a.SortOrder).ToList());
 
         var allGroupedRunIds = attemptFacts
             .Select(a => a.RobotRunId)
             .ToHashSet();
 
-        var reportingRows = new List<RunListItemDto>();
-        var includedRunIds = new HashSet<int>();
+        var reportingRows = new List<ReportingRowFact>();
 
         foreach (var logicalRun in logicalRuns)
         {
-            var attempts = attemptFacts
-                .Where(a => a.LogicalRunId == logicalRun.Id)
-                .OrderBy(a => a.SortOrder)
-                .Select(a => runDetails.GetValueOrDefault(a.RobotRunId))
+            if (!attemptsByLogicalRunId.TryGetValue(logicalRun.Id, out var logicalRunAttempts))
+                continue;
+
+            var attempts = logicalRunAttempts
+                .Select(a => runFactsById.GetValueOrDefault(a.RobotRunId))
                 .Where(r => r != null)
-                .Cast<PhysicalRunDetail>()
+                .Cast<PhysicalRunFact>()
                 .ToList();
 
             if (attempts.Count == 0)
@@ -120,32 +239,30 @@ public class ReportingRunsService
             if (!MatchesWindow(startTimeUtc, from, to))
                 continue;
 
-            foreach (var attempt in attempts)
-                includedRunIds.Add(attempt.Id);
+            var endTimeUtc = attempts.Any(a => a.EndTimeUtc == null)
+                ? null
+                : attempts.Max(a => a.EndTimeUtc);
 
-            reportingRows.Add(new RunListItemDto(
+            reportingRows.Add(new ReportingRowFact(
                 Kind: ReportingRunKind.Logical,
                 RunId: null,
                 LogicalRunId: logicalRun.Id,
                 DisplayName: logicalRun.DisplayName,
                 StartTimeUtc: startTimeUtc,
-                EndTimeUtc: attempts.Any(a => a.EndTimeUtc == null) ? null : attempts.Max(a => a.EndTimeUtc),
+                EndTimeUtc: endTimeUtc,
                 PhysicalOutcome: null,
                 LogicalOutcome: CalculateLogicalOutcome(attempts),
                 AttemptCount: attempts.Count,
-                EventCount: attempts.Sum(a => a.EventCount),
-                MeasurementCount: attempts.Sum(a => a.MeasurementCount)
+                PhysicalRunIds: attempts.Select(a => a.Id).ToList()
             ));
         }
 
-        foreach (var run in runDetails.Values.Where(r => !allGroupedRunIds.Contains(r.Id)))
+        foreach (var run in runFacts.Where(r => !allGroupedRunIds.Contains(r.Id)))
         {
             if (!MatchesWindow(run.StartTimeUtc, from, to))
                 continue;
 
-            includedRunIds.Add(run.Id);
-
-            reportingRows.Add(new RunListItemDto(
+            reportingRows.Add(new ReportingRowFact(
                 Kind: ReportingRunKind.Physical,
                 RunId: run.RunId,
                 LogicalRunId: null,
@@ -155,46 +272,11 @@ public class ReportingRunsService
                 PhysicalOutcome: run.Outcome,
                 LogicalOutcome: null,
                 AttemptCount: 1,
-                EventCount: run.EventCount,
-                MeasurementCount: run.MeasurementCount
+                PhysicalRunIds: new List<int> { run.Id }
             ));
         }
 
-        reportingRows = sort == "asc"
-            ? reportingRows.OrderBy(r => r.StartTimeUtc).ToList()
-            : reportingRows.OrderByDescending(r => r.StartTimeUtc).ToList();
-
-        var totalRunCount = reportingRows.Count;
-
-        if (offset > 0)
-            reportingRows = reportingRows.Skip(offset).ToList();
-
-        if (limit is > 0)
-            reportingRows = reportingRows.Take(limit.Value).ToList();
-
-        var includedRunDetails = includedRunIds
-            .Select(id => runDetails.GetValueOrDefault(id))
-            .Where(r => r != null)
-            .Cast<PhysicalRunDetail>()
-            .ToList();
-
-        var eventCount = includedRunDetails.Sum(r => r.EventCount);
-        var firstEventUtc = includedRunDetails
-            .Where(r => r.FirstEventUtc != null)
-            .Select(r => r.FirstEventUtc)
-            .Min();
-        var lastEventUtc = includedRunDetails
-            .Where(r => r.LastEventUtc != null)
-            .Select(r => r.LastEventUtc)
-            .Max();
-
-        return new ReportingRunSlice(
-            reportingRows,
-            totalRunCount,
-            eventCount,
-            firstEventUtc,
-            lastEventUtc
-        );
+        return reportingRows;
     }
 
     private static DateTime? NormalizeUtc(DateTime? value)
@@ -218,7 +300,7 @@ public class ReportingRunsService
         return true;
     }
 
-    private static LogicalRunOutcome CalculateLogicalOutcome(IEnumerable<PhysicalRunDetail> attempts)
+    private static LogicalRunOutcome CalculateLogicalOutcome(IEnumerable<PhysicalRunFact> attempts)
     {
         var attemptList = attempts.ToList();
 
@@ -229,6 +311,7 @@ public class ReportingRunsService
             return LogicalRunOutcome.InProgress;
 
         var hasSucceeded = attemptList.Any(a => a.Outcome == RunOutcome.Succeeded);
+
         if (hasSucceeded && attemptList.Count > 1)
             return LogicalRunOutcome.SucceededAfterRetry;
 
@@ -246,23 +329,35 @@ public class ReportingRunsService
         RunOutcome? Outcome
     );
 
-    private sealed record PhysicalRunDetail(
+    private sealed record LogicalRunFact(
         int Id,
-        string RunId,
+        string DisplayName
+    );
+
+    private sealed record LogicalRunAttemptFact(
+        int LogicalRunId,
+        int RobotRunId,
+        int SortOrder
+    );
+
+    private sealed record ReportingRowFact(
+        ReportingRunKind Kind,
+        string? RunId,
+        int? LogicalRunId,
+        string? DisplayName,
         DateTime StartTimeUtc,
         DateTime? EndTimeUtc,
-        RunOutcome? Outcome,
-        int EventCount,
-        int MeasurementCount,
+        RunOutcome? PhysicalOutcome,
+        LogicalRunOutcome? LogicalOutcome,
+        int AttemptCount,
+        List<int> PhysicalRunIds
+    );
+
+    private sealed record EventStat(
+        int Count,
         DateTime? FirstEventUtc,
         DateTime? LastEventUtc
     );
-
-    private sealed record LogicalRunFact(int Id, string DisplayName, DateTime CreatedUtc);
-
-    private sealed record LogicalRunAttemptFact(int LogicalRunId, int RobotRunId, int SortOrder);
-
-    private sealed record EventStat(int Count, DateTime? FirstEventUtc, DateTime? LastEventUtc);
 }
 
 public record ReportingRunSlice(

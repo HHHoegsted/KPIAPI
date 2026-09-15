@@ -170,15 +170,15 @@ namespace KPIAPI.Services
         }
 
         public async Task<PaginatedRunListDto> ListRunsForRobotAsync(
-            string robotKey,
-            DateTime? fromUtc,
-            int limit,
-            int offset,
-            string sort,
-            bool developerMode = false)
+        string robotKey,
+        DateTime? fromUtc,
+        int limit,
+        int offset,
+        string sort,
+        bool developerMode = false)
         {
             robotKey = robotKey.Trim().ToLowerInvariant();
-            limit = Math.Clamp(limit, 1, 2000);
+            limit = Math.Clamp(limit, 1, 50);
             offset = Math.Max(0, offset);
             sort = (sort ?? "desc").Trim().ToLowerInvariant();
 
@@ -186,10 +186,12 @@ namespace KPIAPI.Services
                 return new PaginatedRunListDto(new List<RunListItemDto>(), 0, offset, limit);
 
             var robot = await _db.Robots.AsNoTracking().FirstOrDefaultAsync(r => r.Key == robotKey);
+
             if (robot == null)
                 return new PaginatedRunListDto(new List<RunListItemDto>(), 0, offset, limit);
 
-            var slice = await _reportingRunsService.BuildAsync(robot, fromUtc, null, sort, limit, offset);
+            var slice = await _reportingRunsService.BuildPageAsync(robot, fromUtc, sort, limit, offset);
+
             return new PaginatedRunListDto(slice.Items, slice.RunCount, offset, limit);
         }
 
